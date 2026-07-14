@@ -25,6 +25,7 @@ export type MarketQuote = {
 export type StockSnapshot = {
   symbol: string;
   name: string;
+  market: "TW" | "US";
   price: DataPoint<number>;
   dayChangePercent: number;
   revenueGrowth: number | null;

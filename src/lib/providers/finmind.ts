@@ -6,14 +6,6 @@ import { taipeiDate } from "@/lib/reports/calendar";
 import type { StockSnapshot } from "@/types/domain";
 
 const FINMIND_DATA_URL = "https://api.finmindtrade.com/api/v4/data";
-const TAIWAN_SYMBOLS = new Set([
-  "2330",
-  "2317",
-  "2454",
-  "2327",
-  "2344",
-  "2408",
-]);
 
 const finMindResponseSchema = z.object({
   status: z.number(),
@@ -45,7 +37,7 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
     const token = process.env.FINMIND_API_TOKEN;
     if (!token)
       return mockStocks.map((stock) =>
-        TAIWAN_SYMBOLS.has(stock.symbol)
+        stock.market === "TW"
           ? this.markFallback(
               stock,
               "未設定 FINMIND_API_TOKEN，已使用 Mock Data。",
@@ -55,7 +47,7 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
 
     return Promise.all(
       mockStocks.map(async (stock) => {
-        if (!TAIWAN_SYMBOLS.has(stock.symbol)) return stock;
+        if (stock.market !== "TW") return stock;
         try {
           return await this.fetchTaiwanStock(stock, token);
         } catch (error) {

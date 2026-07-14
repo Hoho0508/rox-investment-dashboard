@@ -2,18 +2,22 @@
 
 ## Project Structure & Module Organization
 
-This repository is currently an empty project scaffold. Keep the root directory limited to project-wide configuration and documentation. As the project grows, place application code in `src/`, automated tests in `tests/`, and static resources in `assets/`. Mirror source paths in the test tree where practical; for example, test `src/auth/session.*` with `tests/auth/session.test.*`. Document any new top-level directory in the README.
+This repository contains a Next.js App Router application. Keep the root directory limited to project-wide configuration and documentation. Place pages and API routes in `src/app/`, reusable UI in `src/components/`, domain and infrastructure code in `src/lib/`, and shared domain types in `src/types/`. Keep Prisma schema, migrations, and seed data in `prisma/`, command-line utilities in `scripts/`, and automated tests in `tests/`. Mirror source responsibilities in the test tree where practical. Document any new top-level directory in the README.
 
 ## Build, Test, and Development Commands
 
-No build system, package manager, or test runner is configured yet. When introducing one, expose a small, predictable command set and update this guide in the same change. Preferred entry points are:
+Use the pinned pnpm version declared in `package.json`; do not mix package managers or create another lockfile.
 
-- `make setup` or the ecosystem equivalent: install development dependencies.
-- `make test`: run the complete automated test suite.
-- `make lint`: run formatting and static-analysis checks.
-- `make run`: start the project locally.
-
-Do not document commands until their configuration files and scripts exist and have been verified locally.
+- `pnpm install`: install dependencies.
+- `pnpm dev`: start the local Next.js development server.
+- `pnpm format:check`: verify Prettier formatting without changing files.
+- `pnpm lint`: run ESLint with zero warnings allowed.
+- `pnpm typecheck`: run TypeScript without emitting files.
+- `pnpm test`: run deterministic Vitest unit tests.
+- `pnpm test:e2e`: run Playwright desktop and mobile end-to-end tests.
+- `pnpm build`: produce a local production build without deploying it.
+- `pnpm check`: run formatting, lint, typecheck, and unit tests together.
+- `pnpm db:generate`, `pnpm db:deploy`, and `pnpm db:seed`: prepare a configured PostgreSQL database.
 
 ## Coding Style & Naming Conventions
 
@@ -21,7 +25,7 @@ Follow the standard formatter for the chosen language and commit its configurati
 
 ## Testing Guidelines
 
-Add tests with every behavior change or bug fix. Keep tests deterministic and independent of external services; use fixtures or mocks when necessary. Name test files according to the selected framework, such as `test_session.py` or `session.test.ts`. Once tooling is selected, define the exact test command and any coverage threshold here and in continuous integration.
+Add tests with every behavior change or bug fix. Keep tests deterministic and independent of external services; use fixtures or mocks when necessary. Name Vitest files `*.test.ts` and Playwright files `*.spec.ts`. Run `pnpm check` for every change and `pnpm test:e2e` for user-visible flows. No numeric coverage threshold is configured yet; critical authentication, scheduling, provider fallback, report, and scoring rules must have direct tests.
 
 ## Commit & Pull Request Guidelines
 
@@ -29,4 +33,4 @@ There is no existing commit history from which to infer a convention. Use short,
 
 ## Security & Configuration
 
-Never commit credentials, tokens, private keys, or local environment files. Provide sanitized examples such as `.env.example`, and add generated files and secrets to `.gitignore` before introducing project tooling.
+Never commit credentials, tokens, private keys, or local environment files. Use only sanitized placeholders in `.env.example`. Read FinMind credentials only from `process.env.FINMIND_API_TOKEN`; missing or failed live data must fall back safely to clearly labelled Mock data. Keep authentication, cron, session, and database secrets server-side. Generated Prisma clients, test output, build output, and local databases remain ignored by Git.

@@ -6,6 +6,7 @@ import type { StockSnapshot } from "@/types/domain";
 const stock = (overrides: Partial<StockSnapshot> = {}): StockSnapshot => ({
   symbol: "TEST",
   name: "測試公司",
+  market: "US",
   price: {
     value: 100,
     sourceName: "test",

@@ -58,6 +58,7 @@ export class MockMarketDataProvider implements MarketDataProvider {
       {
         symbol: "2330",
         name: "台積電",
+        market: "TW",
         price: point(1060, marketDate),
         dayChangePercent: -0.9,
         revenueGrowth: 24,
@@ -73,6 +74,7 @@ export class MockMarketDataProvider implements MarketDataProvider {
       {
         symbol: "NVDA",
         name: "NVIDIA",
+        market: "US",
         price: point(138.4, marketDate),
         dayChangePercent: -1.7,
         revenueGrowth: 78,
@@ -88,6 +90,7 @@ export class MockMarketDataProvider implements MarketDataProvider {
       {
         symbol: "2317",
         name: "鴻海",
+        market: "TW",
         price: point(187.5, marketDate),
         dayChangePercent: 0.5,
         revenueGrowth: 12,
