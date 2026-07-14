@@ -1,0 +1,8 @@
+.next
+node_modules
+coverage
+playwright-report
+.playwright-browsers
+test-results
+pnpm-lock.yaml
+src/generated

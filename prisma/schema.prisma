@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model MorningReport {
+  id             String   @id @default(cuid())
+  reportDate     String
+  reportType     String   @default("morning")
+  generatedAt    DateTime @default(now())
+  latestDataAt   DateTime
+  dataMode       String
+  completeness   Int
+  isTradingDay   Boolean
+  marketView     String
+  payload        String
+  createdAt      DateTime @default(now())
+
+  @@unique([reportDate, reportType])
+  @@index([generatedAt])
+}
+
+model JobRun {
+  id           String   @id @default(cuid())
+  jobName      String
+  reportDate   String?
+  status       String
+  attempt      Int      @default(1)
+  startedAt    DateTime @default(now())
+  completedAt  DateTime?
+  durationMs   Int?
+  errorMessage String?
+  missingData  String?
+
+  @@index([jobName, startedAt])
+}
+
+model JournalEntry {
+  id                 String   @id @default(cuid())
+  symbol             String
+  action             String
+  status             String
+  quantity           Float?
+  price              Float?
+  reason             String
+  biggestRisk        String
+  invalidation       String
+  fomo               Boolean  @default(false)
+  singleDayMove      Boolean  @default(false)
+  questionsCompleted Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model ManualDataPoint {
+  id         String   @id @default(cuid())
+  symbol     String
+  field      String
+  value      Float
+  marketDate String
+  sourceName String
+  createdAt  DateTime @default(now())
+
+  @@unique([symbol, field, marketDate])
+}
