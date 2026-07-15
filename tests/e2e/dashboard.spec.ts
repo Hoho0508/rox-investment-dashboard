@@ -45,3 +45,27 @@ test("可開啟台股 K 線、自選行情與歷史判斷", async ({ page }) => 
     page.getByRole("heading", { name: "最相似的歷史市場情境" }),
   ).toBeVisible();
 });
+
+test("首頁顯示 AI 市場脈動且不把 Mock 當真實新聞", async ({ page }) => {
+  await login(page);
+  await expect(
+    page.getByRole("heading", { name: "今日市場脈動" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/族群、資金流與市場主題為版型示範/),
+  ).toBeVisible();
+});
+
+test("股票獨立頁預設顯示 1 分鐘 K 與可解釋技術評分", async ({ page }) => {
+  await login(page);
+  await page.goto("/stocks/2330");
+  await expect(
+    page.getByRole("heading", { name: "2330 技術分析中心" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "1 分", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/分鐘 K 為模擬資料/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "技術面判斷" })).toBeVisible();
+  await expect(page.getByText("失效條件：", { exact: false })).toBeVisible();
+});

@@ -368,6 +368,13 @@ th {
   background: transparent;
   color: var(--muted);
 }
+.open-analysis {
+  display: block;
+  padding: 8px 14px 12px;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+}
 .trading-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.7fr);
@@ -497,6 +504,170 @@ th {
   color: var(--muted);
   font-size: 13px;
 }
+.pulse-card {
+  border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border));
+  border-radius: 20px;
+  padding: 24px;
+  background:
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--brand) 16%, transparent),
+      transparent 32%
+    ),
+    var(--surface);
+}
+.pulse-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.pulse-score {
+  display: grid;
+  justify-items: end;
+}
+.pulse-score strong {
+  font-size: 42px;
+  line-height: 1;
+  color: var(--brand);
+}
+.pulse-score span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.pulse-grid > div {
+  background: color-mix(in srgb, var(--surface2) 65%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+.pulse-grid h3 {
+  font-size: 13px;
+  margin: 0 0 10px;
+}
+.pulse-grid ol,
+.pulse-grid ul {
+  padding-left: 20px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.pulse-grid blockquote {
+  margin: 8px 0;
+  color: var(--brand);
+  font-weight: 700;
+}
+.pulse-grid small {
+  color: var(--muted);
+}
+.pulse-strategy {
+  grid-column: span 2;
+}
+.pulse-strategy p {
+  margin: 5px 0;
+}
+.pulse-card details {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.interval-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.interval-tabs button {
+  white-space: nowrap;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.interval-tabs button.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+.technical-workspace {
+  display: grid;
+  gap: 16px;
+}
+.indicator-board {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 20px;
+}
+.indicator-table {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.indicator-table > div {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+}
+.indicator-table span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.indicator-table b {
+  font-size: 14px;
+}
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.level-grid span {
+  background: var(--surface2);
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.technical-zone,
+.pattern-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+.technical-zone span,
+.pattern-row span {
+  color: var(--brand);
+  font-size: 12px;
+}
+.technical-zone small,
+.pattern-row p {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  margin: 0;
+  font-size: 12px;
+}
+.verdict-適合開始研究 {
+  background: color-mix(in srgb, #16a34a 14%, var(--surface));
+  color: #16a34a;
+}
+.verdict-等待突破,
+.verdict-等待回測 {
+  background: color-mix(in srgb, #d97706 14%, var(--surface));
+  color: #d97706;
+}
+.verdict-風險增加 {
+  background: color-mix(in srgb, #dc2626 14%, var(--surface));
+  color: #dc2626;
+}
 .footer {
   color: var(--muted);
   font-size: 12px;
@@ -569,6 +740,12 @@ form input[type="checkbox"] {
   .search-results {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .pulse-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .indicator-table {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 @media (max-width: 720px) {
   .shell {
@@ -628,5 +805,17 @@ form input[type="checkbox"] {
   }
   .indicator-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .pulse-card {
+    padding: 16px;
+  }
+  .pulse-grid {
+    grid-template-columns: 1fr;
+  }
+  .pulse-strategy {
+    grid-column: 1;
+  }
+  .indicator-table {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

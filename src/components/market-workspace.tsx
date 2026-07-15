@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CandlestickChart } from "@/components/candlestick-chart";
 import type {
   LiveQuote,
@@ -246,6 +247,9 @@ export function MarketWorkspace({
                 </em>
                 <small>{quote ? modeLabel(quote) : "等待行情"}</small>
               </button>
+              <Link className="open-analysis" href={`/stocks/${item.symbol}`}>
+                完整技術分析
+              </Link>
               <button
                 aria-label={`移除 ${item.name}`}
                 className="remove-watch"

@@ -6,6 +6,7 @@ import {
 } from "@/lib/market/finmind-market";
 import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
 import type { LiveQuote } from "@/types/market";
+import type { CandleInterval, PriceCandle } from "@/types/market";
 
 const BASE_URL = "https://api.fugle.tw/marketdata/v1.0/stock";
 const quoteSchema = z.object({
@@ -24,6 +25,49 @@ const quoteSchema = z.object({
   isClose: z.boolean().optional(),
   total: z.object({ tradeVolume: z.number().nullish() }).optional(),
 });
+const candleSchema = z.object({
+  data: z.array(
+    z.object({
+      date: z.string(),
+      open: z.coerce.number(),
+      high: z.coerce.number(),
+      low: z.coerce.number(),
+      close: z.coerce.number(),
+      volume: z.coerce.number(),
+    }),
+  ),
+});
+
+export async function fetchFugleIntradayCandles(
+  symbol: string,
+  interval: CandleInterval,
+  apiKey: string,
+): Promise<PriceCandle[]> {
+  const timeframe = interval.replace("m", "");
+  if (!["1", "5", "15", "30", "60"].includes(timeframe))
+    throw new Error("Fugle 不支援此分鐘週期");
+  const url = new URL(
+    `${BASE_URL}/intraday/candles/${encodeURIComponent(symbol)}`,
+  );
+  url.searchParams.set("timeframe", timeframe);
+  const response = await fetch(url, {
+    headers: { "X-API-KEY": apiKey, Accept: "application/json" },
+    signal: AbortSignal.timeout(6_000),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Fugle 分鐘 K HTTP ${response.status}`);
+  const parsed = candleSchema.parse(await response.json());
+  return parsed.data
+    .map((item) => ({
+      time: item.date,
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+      volume: item.volume,
+    }))
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
 
 export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider {
   private readonly fallback = new MockRealtimeTaiwanProvider();

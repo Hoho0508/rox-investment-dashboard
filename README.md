@@ -1,5 +1,7 @@
 # Rox Investment Dashboard
 
+V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)。
+
 供投資初學者使用的繁體中文市場晨報、資料來源追蹤、條件評分與投資紀律工具。系統不下單、不預測精確價格，也不提供保證獲利的訊號。
 
 ## 目前功能
@@ -18,6 +20,12 @@
 - 60／120／240 日 K 線與成交量圖
 - RSI、均線、動能、波動、回撤與成交量分析
 - 相似歷史市場情境、後續 5／20／60 日表現與透明進場判斷
+- 每檔股票獨立技術分析頁，預設 1 分鐘 K
+- 1／5／15／30／60 分鐘與日／週／月 K 切換
+- MA、EMA、VWAP、MACD、RSI、KD、ATR、Momentum、OBV、Volume MA、Bollinger 與標準差
+- 技術面 0～100 評分、目前位置、支持／反對證據、最大風險與失效條件
+- 支撐壓力、研究／突破／回測／風險區間與基礎型態辨識
+- 首頁 AI 市場脈動版型；缺少真實族群／新聞資料時清楚標示示範
 
 ## 結構
 
@@ -28,6 +36,8 @@ src/lib/config/      評分、情境與風險設定
 src/lib/providers/   資料供應商介面與 Mock provider
 src/lib/market/      台股清單、盤中行情、K 線與自選清單
 src/lib/analysis/    歷史相似情境與透明進場分析
+src/lib/technical/   純函式技術指標、評分、位置與型態分析
+src/lib/intelligence/ 市場脈動與後續 AI 情報聚合
 src/lib/reports/     時區、生成、儲存與排程工作
 src/lib/scoring/     進場與出場規則
 src/lib/validation/  Zod 輸入驗證
@@ -119,6 +129,10 @@ REPORT_MAX_RETRIES=2
 台股日成交價由 `src/lib/providers/finmind.ts` 與 `src/lib/market/finmind-market.ts` 透過 FinMind 取得。Token 只讀取 server-side 的 `process.env.FINMIND_API_TOKEN`；沒有 Token、逾時、額度不足、HTTP 錯誤、空資料或格式異常時，自動切換 Mock，並在 `error` 與資料狀態中標示原因。FinMind 日資料為盤後更新且標示延遲，不冒充盤中即時行情。
 
 盤中即時台股由 `src/lib/market/fugle.ts` 透過 Fugle Intraday Quote 取得，金鑰只讀取 `process.env.FUGLE_MARKETDATA_API_KEY`。前端永遠只呼叫本站受登入保護的 API route，不會接觸供應商金鑰。行情每 15 至 30 秒更新一次並提供手動更新；自選清單保存於 PostgreSQL。沒有 Fugle Key 時改顯示 FinMind 最新交易日收盤價並標示「延遲行情」；只有 FinMind 也失敗時才顯示 Mock。
+
+分鐘 K 使用 Fugle `GET /intraday/candles/{symbol}`，支援 1／5／15／30／60 分鐘。沒有 Fugle Key 或請求失敗時，API 會回傳清楚標示的 `Rox 模擬分鐘 K`，不冒充盤中行情。日／週／月 K 由 FinMind 日資料取得或聚合。Tick 需要 trades 串流與時序儲存層，尚未啟用並會回傳明確原因。
+
+技術分析 Business Logic 全部位於 `src/lib/technical/`；React Component 只負責資料請求與顯示。技術分數不是買賣指令，輸出限制為「適合開始研究／等待突破／等待回測／風險增加」，並必須附支持證據、反對證據、最大風險、失效條件與信心程度。
 
 Live 串接建議優先評估 TWSE／MOPS 公開資料、公司 IR、SEC、BLS、Federal Reserve／FRED，以及具有明確授權條款的市場與新聞 API。可能需要申請市場資料與新聞 API Key；Key 僅能設於 server-side 環境變數。更換供應商時實作 `src/lib/providers/contracts.ts` 介面，並保留來源、資料日期、擷取時間、延遲狀態、信心與結構化錯誤。
 

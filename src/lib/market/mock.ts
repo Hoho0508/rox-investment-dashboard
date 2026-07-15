@@ -1,5 +1,10 @@
 import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
-import type { LiveQuote, PriceCandle, TaiwanSecurity } from "@/types/market";
+import type {
+  CandleInterval,
+  LiveQuote,
+  PriceCandle,
+  TaiwanSecurity,
+} from "@/types/market";
 
 const securities: TaiwanSecurity[] = [
   { symbol: "0050", name: "元大台灣50", exchange: "TWSE", market: "TW" },
@@ -94,6 +99,41 @@ export function mockCandles(symbol: string, limit = 320): PriceCandle[] {
       volume: Math.round(
         5_000_000 + Math.abs(Math.sin(sequence + seed)) * 30_000_000,
       ),
+    });
+  }
+  return rows;
+}
+
+export function mockIntradayCandles(
+  symbol: string,
+  interval: CandleInterval,
+): PriceCandle[] {
+  const minutes = interval === "1m" ? 1 : Number.parseInt(interval, 10) || 1;
+  const seed = hashSymbol(symbol);
+  const base = knownPrices[symbol] ?? 30 + (seed % 170);
+  const rows: PriceCandle[] = [];
+  let close = base;
+  const start = new Date();
+  start.setHours(9, 0, 0, 0);
+  const totalMinutes = 270;
+  for (let minute = 0; minute < totalMinutes; minute += minutes) {
+    const sequence = minute / minutes;
+    const open = close;
+    const move =
+      Math.sin((sequence + seed) * 1.41) * 0.0025 +
+      Math.sin(sequence / 11) * 0.001;
+    close = close * (1 + move);
+    const high = Math.max(open, close) * 1.0015;
+    const low = Math.min(open, close) * 0.9985;
+    const time = new Date(start);
+    time.setMinutes(start.getMinutes() + minute);
+    rows.push({
+      time: time.toISOString(),
+      open: roundPrice(open),
+      high: roundPrice(high),
+      low: roundPrice(low),
+      close: roundPrice(close),
+      volume: Math.round(100 + Math.abs(Math.sin(sequence + seed)) * 4_000),
     });
   }
   return rows;

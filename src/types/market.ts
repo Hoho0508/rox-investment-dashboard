@@ -34,6 +34,32 @@ export type PriceCandle = {
   volume: number;
 };
 
+export const candleIntervals = [
+  "tick",
+  "1m",
+  "5m",
+  "15m",
+  "30m",
+  "60m",
+  "1d",
+  "1w",
+  "1mo",
+] as const;
+export type CandleInterval = (typeof candleIntervals)[number];
+
+export type CandleSeries = {
+  symbol: string;
+  interval: CandleInterval;
+  candles: PriceCandle[];
+  sourceName: string;
+  sourceUrl?: string;
+  dataMode: DataMode;
+  isDelayed: boolean;
+  supportsLive: boolean;
+  asOf: string;
+  error?: string;
+};
+
 export type SimilarMarketPeriod = {
   startDate: string;
   similarity: number;
