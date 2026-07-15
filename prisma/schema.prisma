@@ -67,3 +67,16 @@ model ManualDataPoint {
 
   @@unique([symbol, field, marketDate])
 }
+
+model WatchlistItem {
+  id        String   @id @default(cuid())
+  symbol    String   @unique
+  name      String
+  market    String   @default("TW")
+  exchange  String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder, createdAt])
+}

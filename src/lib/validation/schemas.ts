@@ -31,3 +31,15 @@ export const manualDataSchema = z.object({
   marketDate: z.string().date(),
   sourceName: z.string().trim().min(2).max(100),
 });
+
+export const taiwanSymbolSchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9A-Z]{2,8}$/i)
+  .transform((value) => value.toUpperCase());
+
+export const watchlistItemSchema = z.object({
+  symbol: taiwanSymbolSchema,
+  name: z.string().trim().min(1).max(80),
+  exchange: z.enum(["TWSE", "TPEx", "ESB", "UNKNOWN"]).optional(),
+});

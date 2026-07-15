@@ -31,3 +31,17 @@ test("手機版可導覽至投資日誌", async ({ page }) => {
   await page.getByRole("link", { name: "投資日誌" }).click();
   await expect(page.getByRole("heading", { name: "投資日誌" })).toBeVisible();
 });
+
+test("可開啟台股 K 線、自選行情與歷史判斷", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "即時台股與 K 線" }).click();
+  await expect(
+    page.getByRole("heading", { name: "台股即時追蹤與數據分析" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("股票代碼或名稱")).toBeVisible();
+  await expect(page.getByRole("img", { name: /K 線圖/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "進場判斷" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "最相似的歷史市場情境" }),
+  ).toBeVisible();
+});

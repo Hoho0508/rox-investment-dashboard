@@ -1,0 +1,97 @@
+import { z } from "zod";
+import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
+import {
+  fetchFinMindCandles,
+  searchFinMindSecurities,
+} from "@/lib/market/finmind-market";
+import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
+import type { LiveQuote } from "@/types/market";
+
+const BASE_URL = "https://api.fugle.tw/marketdata/v1.0/stock";
+const quoteSchema = z.object({
+  symbol: z.string(),
+  name: z.string(),
+  exchange: z.string(),
+  lastPrice: z.number().nullish(),
+  closePrice: z.number().nullish(),
+  previousClose: z.number().nullish(),
+  openPrice: z.number().nullish(),
+  highPrice: z.number().nullish(),
+  lowPrice: z.number().nullish(),
+  change: z.number().nullish(),
+  changePercent: z.number().nullish(),
+  lastUpdated: z.number().nullish(),
+  isClose: z.boolean().optional(),
+  total: z.object({ tradeVolume: z.number().nullish() }).optional(),
+});
+
+export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider {
+  private readonly fallback = new MockRealtimeTaiwanProvider();
+
+  constructor(private readonly apiKey: string) {}
+
+  async search(query: string, limit = 20) {
+    try {
+      return await searchFinMindSecurities(query, limit);
+    } catch {
+      return this.fallback.search(query, limit);
+    }
+  }
+
+  async getQuotes(symbols: string[]): Promise<LiveQuote[]> {
+    const fallback = await this.fallback.getQuotes(symbols);
+    return Promise.all(
+      symbols.map(async (symbol, index) => {
+        try {
+          const response = await fetch(
+            `${BASE_URL}/intraday/quote/${encodeURIComponent(symbol)}`,
+            {
+              headers: { "X-API-KEY": this.apiKey, Accept: "application/json" },
+              signal: AbortSignal.timeout(6_000),
+              cache: "no-store",
+            },
+          );
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const quote = quoteSchema.parse(await response.json());
+          const price = quote.lastPrice ?? quote.closePrice ?? null;
+          const asOf = quote.lastUpdated
+            ? new Date(Math.floor(quote.lastUpdated / 1000)).toISOString()
+            : new Date().toISOString();
+          return {
+            symbol: quote.symbol,
+            name: quote.name,
+            exchange: quote.exchange === "TWSE" ? "TWSE" : "TPEx",
+            market: "TW",
+            price,
+            previousClose: quote.previousClose ?? null,
+            open: quote.openPrice ?? null,
+            high: quote.highPrice ?? null,
+            low: quote.lowPrice ?? null,
+            change: quote.change ?? null,
+            changePercent: quote.changePercent ?? null,
+            volume: quote.total?.tradeVolume ?? null,
+            asOf,
+            sourceName: "Fugle 即時行情",
+            sourceUrl: `${BASE_URL}/intraday/quote/${symbol}`,
+            dataMode: "live",
+            isDelayed: false,
+            status: quote.isClose ? "closed" : "open",
+          } satisfies LiveQuote;
+        } catch (error) {
+          return {
+            ...fallback[index],
+            error: `Fugle 取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
+          };
+        }
+      }),
+    );
+  }
+
+  async getCandles(symbol: string, limit = 320) {
+    try {
+      return await fetchFinMindCandles(symbol, limit);
+    } catch {
+      return this.fallback.getCandles(symbol, limit);
+    }
+  }
+}

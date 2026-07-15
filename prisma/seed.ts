@@ -26,6 +26,17 @@ async function main() {
       latestDataAt: new Date(report.latestDataAt),
     },
   });
+  for (const [sortOrder, stock] of [
+    { symbol: "2330", name: "台積電", exchange: "TWSE" },
+    { symbol: "2317", name: "鴻海", exchange: "TWSE" },
+    { symbol: "2454", name: "聯發科", exchange: "TWSE" },
+  ].entries()) {
+    await prisma.watchlistItem.upsert({
+      where: { symbol: stock.symbol },
+      create: { ...stock, market: "TW", sortOrder },
+      update: { name: stock.name, exchange: stock.exchange, sortOrder },
+    });
+  }
 }
 
 main().finally(() => prisma.$disconnect());

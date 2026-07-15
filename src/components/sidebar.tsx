@@ -5,7 +5,7 @@ const links = [
   ["/", "總覽"],
   ["/reports", "每日晨報"],
   ["/history", "歷史報告"],
-  ["/stocks", "核心股票"],
+  ["/stocks", "即時台股與 K 線"],
   ["/scoring", "進出場評分"],
   ["/journal", "投資日誌"],
   ["/data-status", "資料狀態"],

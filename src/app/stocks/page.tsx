@@ -1,36 +1,31 @@
-import { latestOrPreview } from "@/lib/reports/view";
+import { MarketWorkspace } from "@/components/market-workspace";
+import { getWatchlist } from "@/lib/market/watchlist";
 
 export const dynamic = "force-dynamic";
 export default async function StocksPage() {
-  const report = await latestOrPreview();
+  const watchlist = await getWatchlist();
   return (
     <>
       <div className="topline">
         <div>
-          <div className="eyebrow">Core Watchlist</div>
-          <h1>核心股票</h1>
+          <div className="eyebrow">Live market workspace</div>
+          <h1>台股即時追蹤與數據分析</h1>
           <p className="muted">
-            不猜測持股、成本或現金；目前只顯示資料與投資理由狀態。
+            搜尋上市上櫃股票、建立自選清單，並用 K
+            線與相似歷史情境檢查進場邏輯。
           </p>
         </div>
       </div>
-      <div className="grid grid-3">
-        {report.stocks.map((stock) => (
-          <article className="card" key={stock.symbol}>
-            <div className="eyebrow">{stock.symbol}</div>
-            <h2>{stock.name}</h2>
-            <div className="metric">{stock.price.value ?? "資料不足"}</div>
-            <p>
-              展望：{stock.outlook}｜投資理由：
-              {stock.thesisIntact ? "仍成立，持續驗證" : "需複核"}
-            </p>
-            <p className="muted">主要風險：{stock.majorRisk}</p>
-            <p className="source">
-              {stock.price.sourceName} · {stock.price.marketDate} · 延遲資料
-            </p>
-          </article>
-        ))}
-      </div>
+      <p className="notice">
+        即時行情與歷史分析是兩個獨立資料層；每張卡片都會標示來源、時間與是否為模擬或延遲資料。
+      </p>
+      <MarketWorkspace
+        initialWatchlist={watchlist.map((item) => ({
+          symbol: item.symbol,
+          name: item.name,
+          exchange: item.exchange,
+        }))}
+      />
     </>
   );
 }
