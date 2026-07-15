@@ -69,3 +69,14 @@
 - **跳過的項目：** 未新增服務、未取得或修改 Token、未改正式環境變數、未部署、未推送正式分支。
 - **需要核准的事項：** 全球市場、美股與基本面 Provider 仍需先完成來源、授權與成本評估，未列入本輪。
 - **下一輪建議：** 先確認正式環境至少有一個有效的 `FINMIND_API_TOKEN` 或 `FUGLE_MARKETDATA_API_KEY`；若要補全球市場，需另行核准 Provider 提案。
+
+## Run 003 — 舊報告安全正規化與手動刷新
+
+- **開始時間：** 2026-07-15 15:55 Asia/Taipei
+- **檢查結果：** 最新 Production 已部署新 UI，但同日資料庫仍保存舊版晨報 payload，導致舊的方向敘事與風險文字繼續顯示；手動產生 endpoint 因同日去重無法刷新該筆資料。
+- **選擇的工作：** 本輪只修正既有報告讀取安全化，並讓登入後的手動產生使用 upsert 更新同日同類報告；Cron 去重不變。
+- **修改檔案：** `src/lib/reports/safety.ts`、`src/lib/reports/store.ts`、`src/app/api/reports/generate/route.ts`、`tests/unit/reports.test.ts`、README 與追蹤文件。
+- **執行命令：** `pnpm format`、`pnpm check`、`pnpm test:e2e`、`pnpm build`、`git diff --check`。
+- **發現的風險：** 手動刷新會增加一次 Fugle／FinMind 呼叫，但需要有效登入且只 upsert 同一筆；不會刪除歷史資料或產生重複報告。
+- **跳過的項目：** 未修改任何 Token、帳號權限、評分權重或外部 Provider。
+- **下一輪建議：** 確認 Production 手動刷新後，台股價格是否取得 Fugle／FinMind 真實來源；缺少全球或美股 Provider 時維持空白。

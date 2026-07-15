@@ -13,7 +13,8 @@ export async function POST(request: Request) {
       reportType?: unknown;
     };
     const reportType = parseReportType(body.reportType);
-    const result = await runReportJob(reportType);
+    // 使用者主動要求產生時更新同日同類報告；資料庫 upsert 仍確保只有一筆。
+    const result = await runReportJob(reportType, { force: true });
     return Response.json(result, {
       status: result.status === "created" ? 201 : 200,
     });

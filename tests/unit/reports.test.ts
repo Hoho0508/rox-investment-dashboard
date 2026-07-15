@@ -5,6 +5,7 @@ import {
   validateScenarioTotal,
 } from "@/lib/reports/generate";
 import { REPORT_DEFINITIONS, parseReportType } from "@/lib/reports/config";
+import { sanitizeReportForDataAvailability } from "@/lib/reports/safety";
 
 describe("晨報生成", () => {
   afterEach(() => {
@@ -82,5 +83,30 @@ describe("晨報生成", () => {
     expect(report.conclusion).toContain("目前資料不足");
     expect(report.conclusion).not.toContain("科技股情緒偏弱");
     expect(validateScenarioTotal(report)).toBe(true);
+  });
+
+  it("讀取舊報告時會移除資料不足卻仍存在的推測敘事", async () => {
+    const oldReport = await generateMorningReport();
+    const sanitized = sanitizeReportForDataAvailability({
+      ...oldReport,
+      dataMode: "unavailable",
+      globalMarkets: [],
+      scenarioModelAvailable: false,
+      marketView: "震盪",
+      confidence: 68,
+      volatility: "中",
+      conclusion: "科技股情緒偏弱、殖利率上升，台股較可能震盪。",
+    });
+    expect(sanitized.marketView).toBe("資料不足");
+    expect(sanitized.confidence).toBe(0);
+    expect(sanitized.volatility).toBe("未知");
+    expect(sanitized.conclusion).toContain("目前資料不足");
+    expect(sanitized.conclusion).not.toContain("科技股情緒偏弱");
+    expect(
+      sanitized.scenarios.every((scenario) =>
+        scenario.trigger.includes("資料不足"),
+      ),
+    ).toBe(true);
+    expect(validateScenarioTotal(sanitized)).toBe(true);
   });
 });

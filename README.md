@@ -88,6 +88,8 @@ pnpm build
 
 登入網站後可直接按「立即產生晨報」。Cron endpoint 也可由管理者手動觸發：
 
+手動按鈕會重新取得正式資料並以 upsert 更新同日同類報告，不會新增重複紀錄；Cron 排程仍保留同日去重，避免不必要的 API 呼叫。
+
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" \
   http://localhost:3000/api/cron/morning-report

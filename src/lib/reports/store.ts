@@ -2,11 +2,12 @@ import { prisma } from "@/lib/db/client";
 import { taipeiDate } from "@/lib/reports/calendar";
 import { generateReport, validateScenarioTotal } from "@/lib/reports/generate";
 import { REPORT_DEFINITIONS, type ReportType } from "@/lib/reports/config";
+import { sanitizeReportForDataAvailability } from "@/lib/reports/safety";
 import type { DailyReport } from "@/types/domain";
 
 function parseStoredReport(payload: string, id: string): DailyReport {
   const parsed = JSON.parse(payload) as Partial<DailyReport>;
-  return {
+  const report = {
     ...parsed,
     id,
     reportType: parsed.reportType ?? "morning",
@@ -14,6 +15,7 @@ function parseStoredReport(payload: string, id: string): DailyReport {
       parsed.scenarioModelAvailable ??
       Boolean(parsed.globalMarkets?.some((item) => item.price.value !== null)),
   } as DailyReport;
+  return sanitizeReportForDataAvailability(report);
 }
 
 export async function saveReport(report: DailyReport) {
