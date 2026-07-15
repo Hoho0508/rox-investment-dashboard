@@ -1,20 +1,25 @@
 import { requireOwnerSession } from "@/lib/auth/request";
-import { runMorningReportJob } from "@/lib/reports/store";
+import { parseReportType } from "@/lib/reports/config";
+import { runReportJob } from "@/lib/reports/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST() {
+export async function POST(request: Request) {
   const unauthorized = await requireOwnerSession();
   if (unauthorized) return unauthorized;
   try {
-    const result = await runMorningReportJob();
+    const body = (await request.json().catch(() => ({}))) as {
+      reportType?: unknown;
+    };
+    const reportType = parseReportType(body.reportType);
+    const result = await runReportJob(reportType);
     return Response.json(result, {
       status: result.status === "created" ? 201 : 200,
     });
   } catch {
     return Response.json(
-      { error: "晨報產生失敗，請查看排程執行紀錄。" },
+      { error: "報告產生失敗，請查看排程執行紀錄。" },
       { status: 500 },
     );
   }

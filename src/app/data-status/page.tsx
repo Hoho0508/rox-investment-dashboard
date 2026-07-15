@@ -11,7 +11,8 @@ export default async function DataStatusPage() {
         </div>
       </div>
       <div className="notice">
-        目前第一版使用 Mock provider。數值是測試資料，不可視為真實行情。
+        正式站採嚴格真實資料模式。尚未串接或暫時失效的來源會顯示缺少資料，不使用
+        Mock 數值補位。
       </div>
       <div className="card section">
         <div className="table-wrap">
@@ -26,19 +27,30 @@ export default async function DataStatusPage() {
               </tr>
             </thead>
             <tbody>
-              {report.globalMarkets.map((item) => (
-                <tr key={item.symbol}>
-                  <td>{item.name}</td>
-                  <td>{item.price.sourceName}</td>
-                  <td>{item.price.marketDate}</td>
-                  <td>
-                    {new Date(item.price.fetchedAt).toLocaleString("zh-TW", {
-                      timeZone: "Asia/Taipei",
-                    })}
+              {report.globalMarkets.length ? (
+                report.globalMarkets.map((item) => (
+                  <tr key={item.symbol}>
+                    <td>{item.name}</td>
+                    <td>{item.price.sourceName}</td>
+                    <td>{item.price.marketDate}</td>
+                    <td>
+                      {new Date(item.price.fetchedAt).toLocaleString("zh-TW", {
+                        timeZone: "Asia/Taipei",
+                      })}
+                    </td>
+                    <td>
+                      {item.price.dataMode === "live" ? "正式" : "缺少資料"}／
+                      {item.price.isDelayed ? "延遲" : "即時"}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>
+                    全球市場正式資料尚未串接；正式站未使用 Mock。
                   </td>
-                  <td>模擬／延遲</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

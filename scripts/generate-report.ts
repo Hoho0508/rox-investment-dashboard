@@ -1,6 +1,9 @@
-import { runMorningReportJob } from "../src/lib/reports/store";
+import { parseReportType } from "../src/lib/reports/config";
+import { runReportJob } from "../src/lib/reports/store";
 
-runMorningReportJob()
+const reportType = parseReportType(process.argv[2]);
+
+runReportJob(reportType)
   .then((result) => {
     console.log(JSON.stringify(result, null, 2));
   })

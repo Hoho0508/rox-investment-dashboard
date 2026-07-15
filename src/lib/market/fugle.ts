@@ -7,6 +7,7 @@ import {
 import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
 import type { LiveQuote } from "@/types/market";
 import type { CandleInterval, PriceCandle } from "@/types/market";
+import { unavailableQuote } from "@/lib/market/unavailable";
 
 const BASE_URL = "https://api.fugle.tw/marketdata/v1.0/stock";
 const quoteSchema = z.object({
@@ -78,7 +79,9 @@ export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider
     try {
       return await searchFinMindSecurities(query, limit);
     } catch {
-      return this.fallback.search(query, limit);
+      return process.env.DATA_MODE === "live"
+        ? []
+        : this.fallback.search(query, limit);
     }
   }
 
@@ -122,6 +125,12 @@ export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider
             status: quote.isClose ? "closed" : "open",
           } satisfies LiveQuote;
         } catch (error) {
+          if (process.env.DATA_MODE === "live")
+            return unavailableQuote(
+              symbol,
+              "Fugle 暫時無法取得",
+              `Fugle 取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
+            );
           return {
             ...fallback[index],
             error: `Fugle 取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
@@ -135,7 +144,9 @@ export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider
     try {
       return await fetchFinMindCandles(symbol, limit);
     } catch {
-      return this.fallback.getCandles(symbol, limit);
+      return process.env.DATA_MODE === "live"
+        ? []
+        : this.fallback.getCandles(symbol, limit);
     }
   }
 }

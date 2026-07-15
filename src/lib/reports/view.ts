@@ -1,10 +1,17 @@
-import { generateMorningReport } from "@/lib/reports/generate";
-import { getLatestReport } from "@/lib/reports/store";
+import { generateReport } from "@/lib/reports/generate";
+import type { ReportType } from "@/lib/reports/config";
+import { getLatestReport, getReportByDate } from "@/lib/reports/store";
 
-export async function latestOrPreview() {
+export async function latestOrPreview(
+  reportType: ReportType = "morning",
+  reportDate?: string,
+) {
   try {
-    return (await getLatestReport()) ?? (await generateMorningReport());
+    const saved = reportDate
+      ? await getReportByDate(reportDate, reportType)
+      : await getLatestReport(reportType);
+    return saved ?? (await generateReport(reportType));
   } catch {
-    return generateMorningReport();
+    return generateReport(reportType);
   }
 }

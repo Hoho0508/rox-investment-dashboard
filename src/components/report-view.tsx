@@ -1,5 +1,7 @@
-import type { MorningReport } from "@/types/domain";
+import Link from "next/link";
+import type { DailyReport } from "@/types/domain";
 import { GenerateReportButton } from "@/components/generate-report-button";
+import { REPORT_DEFINITIONS, REPORT_TYPES } from "@/lib/reports/config";
 
 const n = (value: number | null) =>
   value === null
@@ -8,13 +10,30 @@ const n = (value: number | null) =>
         value,
       );
 
-export function ReportView({ report }: { report: MorningReport }) {
+export function ReportView({ report }: { report: DailyReport }) {
+  const definition = REPORT_DEFINITIONS[report.reportType];
   return (
     <>
+      <nav className="report-tabs" aria-label="每日報告種類">
+        {REPORT_TYPES.map((reportType) => (
+          <Link
+            href={`/reports?type=${reportType}`}
+            className={report.reportType === reportType ? "active" : ""}
+            key={reportType}
+          >
+            {REPORT_DEFINITIONS[reportType].label}
+            <small>{REPORT_DEFINITIONS[reportType].taipeiTime}</small>
+          </Link>
+        ))}
+      </nav>
       <div className="topline">
         <div>
-          <div className="eyebrow">Rox Daily Morning Report</div>
-          <h1>{report.isTradingDay ? "今日市場晨報" : "台股休市版晨報"}</h1>
+          <div className="eyebrow">{definition.eyebrow}</div>
+          <h1>
+            {report.isTradingDay
+              ? definition.title
+              : `台股休市版${definition.label}`}
+          </h1>
           <p className="muted">
             報告日期 {report.reportDate} · 產生於{" "}
             {new Date(report.generatedAt).toLocaleString("zh-TW", {
@@ -27,13 +46,22 @@ export function ReportView({ report }: { report: MorningReport }) {
             ? "模擬資料"
             : report.dataMode === "manual"
               ? "手動資料"
-              : "Live 資料"}
+              : report.dataMode === "live"
+                ? "Live 資料"
+                : "真實資料尚未完整"}
         </span>
       </div>
-      <GenerateReportButton />
+      <GenerateReportButton reportType={report.reportType} />
       {report.dataMode === "mock" && (
         <div className="notice">
           目前顯示模擬資料，不代表真實市場行情；請以正式來源確認後再做判斷。
+        </div>
+      )}
+      {report.dataMode === "unavailable" && (
+        <div className="notice">
+          正式站已停用 Mock
+          補值；缺少合法資料來源的欄位會保持空白。可用的台股資料仍標示 Fugle 或
+          FinMind 來源。
         </div>
       )}
       <section className="grid grid-4 section">
@@ -97,23 +125,31 @@ export function ReportView({ report }: { report: MorningReport }) {
               </tr>
             </thead>
             <tbody>
-              {report.globalMarkets.map((item) => (
-                <tr key={item.symbol}>
-                  <td>
-                    {item.name}
-                    <div className="source">
-                      {item.price.sourceName} ·{" "}
-                      {item.price.isDelayed ? "延遲" : "即時"}
-                    </div>
+              {report.globalMarkets.length ? (
+                report.globalMarkets.map((item) => (
+                  <tr key={item.symbol}>
+                    <td>
+                      {item.name}
+                      <div className="source">
+                        {item.price.sourceName} ·{" "}
+                        {item.price.isDelayed ? "延遲" : "即時"}
+                      </div>
+                    </td>
+                    <td>
+                      {n(item.price.value)} {item.unit}
+                    </td>
+                    <td>{n(item.changePercent.value)}%</td>
+                    <td>{item.price.marketDate}</td>
+                    <td>{item.impact}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5}>
+                    全球市場正式資料 Provider 尚未串接，未顯示模擬數值。
                   </td>
-                  <td>
-                    {n(item.price.value)} {item.unit}
-                  </td>
-                  <td>{n(item.changePercent.value)}%</td>
-                  <td>{item.price.marketDate}</td>
-                  <td>{item.impact}</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
@@ -125,7 +161,7 @@ export function ReportView({ report }: { report: MorningReport }) {
             <thead>
               <tr>
                 <th>股票</th>
-                <th>模擬價格</th>
+                <th>最新價格</th>
                 <th>進場準備度</th>
                 <th>出場警示</th>
                 <th>投資理由</th>
@@ -176,6 +212,16 @@ export function ReportView({ report }: { report: MorningReport }) {
           </ul>
         </div>
       </section>
+      {report.missingData.length > 0 && (
+        <section className="card section">
+          <h2>尚缺的正式資料</h2>
+          <ul className="key-list">
+            {report.missingData.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </section>
+      )}
       <p className="source">
         資料最新時間：
         {new Date(report.latestDataAt).toLocaleString("zh-TW", {

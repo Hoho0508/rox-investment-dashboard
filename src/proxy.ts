@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session";
 
-const PUBLIC_PATHS = new Set(["/api/auth/login", "/api/cron/morning-report"]);
+const PUBLIC_PATHS = new Set([
+  "/api/auth/login",
+  "/api/cron/morning-report",
+  "/api/cron/midday-report",
+  "/api/cron/closing-report",
+]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

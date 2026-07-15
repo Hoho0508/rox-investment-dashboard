@@ -13,20 +13,22 @@ export default function SettingsPage() {
           <p>
             透過伺服器環境變數 <code>DATA_MODE</code> 設定 mock、manual 或
             live。台股盤中即時行情使用 <code>FUGLE_MARKETDATA_API_KEY</code>；
-            FinMind 用於台股清單、日 K 與盤後資料。未設定金鑰時安全降級。
+            FinMind 用於台股清單、日 K 與盤後資料。正式 Live 模式缺少來源時顯示
+            unavailable，不使用模擬值補位。
           </p>
         </div>
         <div className="card">
           <h2>每日排程</h2>
           <p>
-            固定使用 Asia/Taipei。雲端排程於 UTC 01:00 觸發，即台灣時間 09:00。
+            固定使用 Asia/Taipei。晨報、午盤與盤後分別於台灣時間
+            09:00、12:30、15:00 觸發。
           </p>
         </div>
         <div className="card">
           <h2>行情標示</h2>
           <p>
-            所有價格必須顯示即時、已收盤、延遲或模擬狀態，以及資料來源與更新時間。Mock
-            不會冒充真實行情。
+            所有價格必須顯示即時、已收盤、延遲或 unavailable
+            狀態，以及資料來源與更新時間。正式站禁止 Mock 補值。
           </p>
         </div>
         <div className="card">

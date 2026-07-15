@@ -9,7 +9,7 @@ export function MarketPulseView({ pulse }: { pulse: MarketPulse }) {
           <h2>今日市場脈動</h2>
         </div>
         <div className="pulse-score">
-          <strong>{pulse.sentiment.score}</strong>
+          <strong>{pulse.sentiment.score ?? "—"}</strong>
           <span>{pulse.sentiment.label}</span>
         </div>
       </div>

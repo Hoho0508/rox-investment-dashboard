@@ -21,15 +21,21 @@ const finMindResponseSchema = z.object({
 });
 
 export class FinMindMarketDataProvider implements MarketDataProvider {
-  readonly mode = process.env.FINMIND_API_TOKEN ? "live" : "mock";
+  readonly mode = process.env.FINMIND_API_TOKEN
+    ? ("live" as const)
+    : process.env.DATA_MODE === "live"
+      ? ("unavailable" as const)
+      : ("mock" as const);
 
   constructor(
     private readonly fallback: MarketDataProvider = new MockMarketDataProvider(),
     private readonly fetcher: typeof fetch = fetch,
   ) {}
 
-  getGlobalMarkets() {
-    return this.fallback.getGlobalMarkets();
+  async getGlobalMarkets() {
+    return process.env.DATA_MODE === "live"
+      ? []
+      : this.fallback.getGlobalMarkets();
   }
 
   async getCoreStocks(): Promise<StockSnapshot[]> {
@@ -37,25 +43,43 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
     const token = process.env.FINMIND_API_TOKEN;
     if (!token)
       return mockStocks.map((stock) =>
-        stock.market === "TW"
-          ? this.markFallback(
+        process.env.DATA_MODE === "live"
+          ? this.markUnavailable(
               stock,
-              "未設定 FINMIND_API_TOKEN，已使用 Mock Data。",
+              stock.market === "TW"
+                ? "未設定 FINMIND_API_TOKEN，未顯示替代數值。"
+                : "美股正式行情 Provider 尚未串接，未顯示替代數值。",
             )
-          : stock,
+          : stock.market === "TW"
+            ? this.markFallback(
+                stock,
+                "未設定 FINMIND_API_TOKEN，已使用 Mock Data。",
+              )
+            : stock,
       );
 
     return Promise.all(
       mockStocks.map(async (stock) => {
-        if (stock.market !== "TW") return stock;
+        if (stock.market !== "TW")
+          return process.env.DATA_MODE === "live"
+            ? this.markUnavailable(
+                stock,
+                "美股正式行情 Provider 尚未串接，未顯示替代數值。",
+              )
+            : stock;
         try {
           return await this.fetchTaiwanStock(stock, token);
         } catch (error) {
           const reason = error instanceof Error ? error.message : "未知錯誤";
-          return this.markFallback(
-            stock,
-            `FinMind 取得失敗，已使用 Mock Data：${reason}`,
-          );
+          return process.env.DATA_MODE === "live"
+            ? this.markUnavailable(
+                stock,
+                `FinMind 取得失敗，未顯示替代數值：${reason}`,
+              )
+            : this.markFallback(
+                stock,
+                `FinMind 取得失敗，已使用 Mock Data：${reason}`,
+              );
         }
       }),
     );
@@ -129,6 +153,30 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
         confidence: 45,
         error,
       },
+    };
+  }
+
+  private markUnavailable(stock: StockSnapshot, error: string): StockSnapshot {
+    return {
+      ...stock,
+      price: {
+        value: null,
+        sourceName: "尚無可用正式資料",
+        fetchedAt: new Date().toISOString(),
+        isDelayed: true,
+        dataMode: "unavailable",
+        confidence: 0,
+        error,
+      },
+      dayChangePercent: 0,
+      revenueGrowth: null,
+      epsGrowth: null,
+      grossMarginTrend: null,
+      freeCashFlowTrend: null,
+      forwardPe: null,
+      outlook: "未知",
+      thesisIntact: null,
+      majorRisk: error,
     };
   }
 }

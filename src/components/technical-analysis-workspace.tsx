@@ -78,6 +78,11 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
           {series.error ?? "目前為模擬分鐘 K，不代表真實盤中行情。"}
         </p>
       )}
+      {series?.dataMode === "unavailable" && (
+        <p className="notice">
+          {series.error ?? "正式資料暫時無法取得，未顯示模擬 K 線。"}
+        </p>
+      )}
       {error && <p className="notice">{error}</p>}
       <section className="trading-layout">
         <article className="card chart-card">
@@ -96,7 +101,11 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
                 <strong>{number(series.candles.at(-1)?.close ?? null)}</strong>
                 <span>
                   {series.sourceName} ·{" "}
-                  {series.isDelayed ? "延遲或模擬" : "即時"}
+                  {series.dataMode === "unavailable"
+                    ? "資料 unavailable"
+                    : series.isDelayed
+                      ? "延遲"
+                      : "即時"}
                 </span>
               </div>
             )}

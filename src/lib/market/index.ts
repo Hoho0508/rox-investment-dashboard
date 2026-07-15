@@ -25,16 +25,20 @@ export async function searchTaiwanSecurities(query: string, limit = 20) {
   try {
     return await searchFinMindSecurities(query, limit);
   } catch {
-    return mock.search(query, limit);
+    return process.env.DATA_MODE === "live" ? [] : mock.search(query, limit);
   }
 }
 
 export async function getTaiwanCandles(symbol: string, limit = 320) {
   try {
     const rows = await fetchFinMindCandles(symbol, limit);
-    return rows.length >= 80 ? rows : mock.getCandles(symbol, limit);
+    return rows.length >= 80 || process.env.DATA_MODE === "live"
+      ? rows
+      : mock.getCandles(symbol, limit);
   } catch {
-    return mock.getCandles(symbol, limit);
+    return process.env.DATA_MODE === "live"
+      ? []
+      : mock.getCandles(symbol, limit);
   }
 }
 
@@ -80,7 +84,7 @@ export async function getTaiwanCandleSeries(
       interval,
       candles: [],
       sourceName: "尚未啟用 Tick 儲存層",
-      dataMode: "mock",
+      dataMode: "unavailable",
       isDelayed: true,
       supportsLive: false,
       asOf: now,
@@ -109,6 +113,19 @@ export async function getTaiwanCandleSeries(
           asOf: candles.at(-1)?.time ?? now,
         };
       } catch (error) {
+        if (process.env.DATA_MODE === "live")
+          return {
+            symbol,
+            interval,
+            candles: [],
+            sourceName: "Fugle 暫時無法取得",
+            dataMode: "unavailable",
+            isDelayed: true,
+            supportsLive: false,
+            asOf: now,
+            error:
+              error instanceof Error ? error.message : "Fugle 分鐘 K 取得失敗",
+          };
         const candles = mockIntradayCandles(symbol, interval);
         return {
           symbol,
@@ -124,6 +141,18 @@ export async function getTaiwanCandleSeries(
         };
       }
     }
+    if (process.env.DATA_MODE === "live")
+      return {
+        symbol,
+        interval,
+        candles: [],
+        sourceName: "尚未設定 Fugle",
+        dataMode: "unavailable",
+        isDelayed: true,
+        supportsLive: false,
+        asOf: now,
+        error: "未設定 FUGLE_MARKETDATA_API_KEY，未顯示模擬資料。",
+      };
     const candles = mockIntradayCandles(symbol, interval);
     return {
       symbol,
@@ -139,6 +168,18 @@ export async function getTaiwanCandleSeries(
   }
 
   const daily = await getTaiwanCandles(symbol, 520);
+  if (daily.length === 0)
+    return {
+      symbol,
+      interval,
+      candles: [],
+      sourceName: "FinMind 暫時無法取得",
+      dataMode: "unavailable",
+      isDelayed: true,
+      supportsLive: false,
+      asOf: now,
+      error: "FinMind 日 K 暫時無法取得，未顯示模擬資料。",
+    };
   const candles =
     interval === "1d"
       ? daily

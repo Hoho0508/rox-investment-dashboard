@@ -26,6 +26,27 @@ test("首頁顯示晨報、資料模式與固定聲明", async ({ page }) => {
   await expect(page.getByText(/不構成個人化投資建議/)).toBeVisible();
 });
 
+test("每日報告可切換晨報、午盤與盤後", async ({ page }) => {
+  await login(page);
+  await page.goto("/reports?type=midday");
+  await expect(page.getByRole("heading", { name: /午盤報告/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "立即產生午盤報告" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: /盤後/ }).click();
+  await expect(page.getByRole("heading", { name: /盤後報告/ })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "立即產生盤後報告" }),
+  ).toBeVisible();
+});
+
+test("手機 App 安裝頁提供 iOS 或 Android 指引", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "安裝手機 App" }).click();
+  await expect(page.getByRole("heading", { name: "安裝到手機" })).toBeVisible();
+  await expect(page.getByText(/加入主畫面|安裝應用程式/)).toBeVisible();
+});
+
 test("手機版可導覽至投資日誌", async ({ page }) => {
   await login(page);
   await page.getByRole("link", { name: "投資日誌" }).click();

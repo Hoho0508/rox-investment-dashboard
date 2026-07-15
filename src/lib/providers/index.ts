@@ -16,9 +16,12 @@ export function resolveDataMode(requested = process.env.DATA_MODE): {
       return {
         mode: "live",
         warning:
-          "僅已授權的資料來源使用正式資料，其餘項目會清楚標示並安全降級。",
+          "正式站採嚴格真實資料模式；尚未串接或暫時失敗的項目只顯示缺少原因，不使用 Mock 補值。",
       };
-    return { mode: "mock", warning: "未設定行情 API 金鑰，已降級為模擬資料。" };
+    return {
+      mode: "unavailable",
+      warning: "未設定行情 API 金鑰；正式站不使用 Mock，資料暫時不可用。",
+    };
   }
   return { mode: "mock" };
 }

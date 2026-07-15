@@ -13,11 +13,14 @@ import {
 
 describe("V2 技術分析中心", () => {
   const originalFugleKey = process.env.FUGLE_MARKETDATA_API_KEY;
+  const originalDataMode = process.env.DATA_MODE;
 
   afterEach(() => {
     if (originalFugleKey === undefined)
       delete process.env.FUGLE_MARKETDATA_API_KEY;
     else process.env.FUGLE_MARKETDATA_API_KEY = originalFugleKey;
+    if (originalDataMode === undefined) delete process.env.DATA_MODE;
+    else process.env.DATA_MODE = originalDataMode;
   });
 
   it("正確計算基本趨勢、動能與波動指標", () => {
@@ -38,6 +41,15 @@ describe("V2 技術分析中心", () => {
     expect(series.dataMode).toBe("mock");
     expect(series.supportsLive).toBe(false);
     expect(series.error).toContain("FUGLE_MARKETDATA_API_KEY");
+  });
+
+  it("正式站沒有行情時保持空白，不生成模擬 K", async () => {
+    delete process.env.FUGLE_MARKETDATA_API_KEY;
+    process.env.DATA_MODE = "live";
+    const series = await getTaiwanCandleSeries("2330", "1m");
+    expect(series.candles).toEqual([]);
+    expect(series.dataMode).toBe("unavailable");
+    expect(series.sourceName).not.toContain("模擬");
   });
 
   it("技術評分固定輸出證據、風險、失效條件與研究用語", () => {

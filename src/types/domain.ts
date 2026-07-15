@@ -1,4 +1,4 @@
-export type DataMode = "mock" | "manual" | "live";
+export type DataMode = "mock" | "manual" | "live" | "unavailable";
 export type Level = "低" | "中" | "高";
 
 export type DataPoint<T> = {
@@ -72,6 +72,7 @@ export type ScoreResult = {
 
 export type MorningReport = {
   id?: string;
+  reportType: import("@/lib/reports/config").ReportType;
   reportDate: string;
   generatedAt: string;
   latestDataAt: string;
@@ -96,3 +97,5 @@ export type MorningReport = {
   discipline: string[];
   missingData: string[];
 };
+
+export type DailyReport = MorningReport;

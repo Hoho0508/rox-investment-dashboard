@@ -3,7 +3,7 @@ import { LogoutButton } from "@/components/logout-button";
 
 const links = [
   ["/", "總覽"],
-  ["/reports", "每日晨報"],
+  ["/reports", "每日報告"],
   ["/history", "歷史報告"],
   ["/stocks", "即時台股與 K 線"],
   ["/scoring", "進出場評分"],
@@ -11,6 +11,7 @@ const links = [
   ["/data-status", "資料狀態"],
   ["/settings", "系統設定"],
   ["/guide", "使用說明"],
+  ["/install", "安裝手機 App"],
 ];
 
 export function Sidebar() {

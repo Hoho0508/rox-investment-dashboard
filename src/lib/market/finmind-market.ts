@@ -4,6 +4,7 @@ import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
 import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
 import { taipeiDate } from "@/lib/reports/calendar";
 import type { LiveQuote, PriceCandle, TaiwanSecurity } from "@/types/market";
+import { unavailableQuote } from "@/lib/market/unavailable";
 
 const DATA_URL = "https://api.finmindtrade.com/api/v4/data";
 const infoSchema = z.object({
@@ -129,7 +130,9 @@ export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvide
     try {
       return await searchFinMindSecurities(query, limit);
     } catch {
-      return this.fallback.search(query, limit);
+      return process.env.DATA_MODE === "live"
+        ? []
+        : this.fallback.search(query, limit);
     }
   }
 
@@ -177,6 +180,12 @@ export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvide
           });
           return quote;
         } catch (error) {
+          if (process.env.DATA_MODE === "live")
+            return unavailableQuote(
+              symbol,
+              "FinMind 暫時無法取得",
+              `FinMind 最新收盤價取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
+            );
           return {
             ...fallback[index],
             error: `FinMind 最新收盤價取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
@@ -190,7 +199,9 @@ export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvide
     try {
       return await fetchFinMindCandles(symbol, limit);
     } catch {
-      return this.fallback.getCandles(symbol, limit);
+      return process.env.DATA_MODE === "live"
+        ? []
+        : this.fallback.getCandles(symbol, limit);
     }
   }
 }

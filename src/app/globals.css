@@ -28,6 +28,7 @@
 }
 body {
   margin: 0;
+  padding-bottom: env(safe-area-inset-bottom);
   background: var(--bg);
   color: var(--text);
   font-family: Arial, "Noto Sans TC", sans-serif;
@@ -110,6 +111,50 @@ a {
 .report-action span {
   color: var(--muted);
   font-size: 13px;
+}
+.report-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.report-tabs a {
+  display: grid;
+  gap: 3px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 700;
+}
+.report-tabs a.active {
+  border-color: var(--brand);
+  background: color-mix(in srgb, var(--brand) 12%, var(--surface));
+  color: var(--text);
+}
+.report-tabs small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.install-actions {
+  display: grid;
+  gap: 14px;
+}
+.install-actions button {
+  justify-self: start;
+}
+.install-actions p {
+  margin: 0;
+  color: var(--brand);
+}
+.install-card {
+  min-height: 220px;
+}
+.notice.success {
+  border-left-color: #16a34a;
+  background: color-mix(in srgb, #16a34a 10%, var(--surface));
 }
 .nav a {
   padding: 10px 12px;
@@ -767,7 +812,9 @@ form input[type="checkbox"] {
     white-space: nowrap;
   }
   .main {
-    padding: 20px 14px;
+    padding: 20px max(14px, env(safe-area-inset-right))
+      calc(20px + env(safe-area-inset-bottom))
+      max(14px, env(safe-area-inset-left));
   }
   .topline {
     display: block;
@@ -817,5 +864,17 @@ form input[type="checkbox"] {
   }
   .indicator-table {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .report-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: -20px -14px 18px;
+    padding: 10px 14px;
+    background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(14px);
+  }
+  .report-tabs a {
+    padding: 10px;
   }
 }

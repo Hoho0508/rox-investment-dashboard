@@ -1,9 +1,9 @@
 import type { MorningReport } from "@/types/domain";
 
 export type MarketPulse = {
-  sentiment: { score: number; label: string };
+  sentiment: { score: number | null; label: string };
   strongestGroups: string[];
-  fundFlows: Array<{ sector: string; direction: "↑" | "→" | "↓" }>;
+  fundFlows: Array<{ sector: string; direction: "↑" | "→" | "↓" | "—" }>;
   narrative: string;
   narrativeEvidence: string[];
   trackedHoldings: Array<{ name: string; status: string }>;
@@ -16,6 +16,27 @@ export type MarketPulse = {
 const clamp = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
 export function buildMarketPulse(report: MorningReport): MarketPulse {
+  if (report.dataMode === "unavailable") {
+    return {
+      sentiment: { score: null, label: "等待正式資料" },
+      strongestGroups: ["尚無正式族群資料"],
+      fundFlows: [
+        { sector: "電子", direction: "—" },
+        { sector: "金融", direction: "—" },
+        { sector: "傳產", direction: "—" },
+      ],
+      narrative: "正式新聞與資金流 Provider 尚未串接",
+      narrativeEvidence: report.missingData,
+      trackedHoldings: report.stocks.slice(0, 2).map((stock) => ({
+        name: stock.name,
+        status: "基本面正式資料尚未完整，暫不判斷",
+      })),
+      strategy: ["等待正式資料確認", "不使用模擬訊號做決策"],
+      confidence: 0,
+      dataMode: report.dataMode,
+      warning: "正式站已停用 Mock；未串接的市場情緒、族群與資金流保持空白。",
+    };
+  }
   const changes = Object.fromEntries(
     report.globalMarkets.map((item) => [
       item.symbol,

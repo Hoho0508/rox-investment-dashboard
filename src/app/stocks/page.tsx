@@ -17,7 +17,8 @@ export default async function StocksPage() {
         </div>
       </div>
       <p className="notice">
-        即時行情與歷史分析是兩個獨立資料層；每張卡片都會標示來源、時間與是否為模擬或延遲資料。
+        即時行情與歷史分析是兩個獨立資料層；每張卡片都會標示來源、時間與即時、延遲或
+        unavailable 狀態。正式站不使用模擬數值補位。
       </p>
       <MarketWorkspace
         initialWatchlist={watchlist.map((item) => ({

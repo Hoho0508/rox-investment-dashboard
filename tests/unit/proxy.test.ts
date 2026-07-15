@@ -33,9 +33,11 @@ describe("私人網站 proxy", () => {
   });
 
   it("Cron endpoint 不受登入 cookie 影響，仍由自身密鑰保護", async () => {
-    const response = await proxy(
-      new NextRequest("https://example.com/api/cron/morning-report"),
-    );
-    expect(response.status).toBe(200);
+    for (const path of ["morning-report", "midday-report", "closing-report"]) {
+      const response = await proxy(
+        new NextRequest(`https://example.com/api/cron/${path}`),
+      );
+      expect(response.status).toBe(200);
+    }
   });
 });

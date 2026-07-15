@@ -22,6 +22,7 @@ function formatNumber(value: number | null, digits = 2) {
 
 function modeLabel(quote: LiveQuote) {
   if (quote.dataMode === "mock") return "模擬資料";
+  if (quote.dataMode === "unavailable") return "正式資料 unavailable";
   if (quote.status === "closed") return "已收盤";
   if (quote.isDelayed) return "延遲行情";
   return "即時行情";
@@ -61,6 +62,10 @@ export function MarketWorkspace({
         refreshAfterSeconds: number;
       };
       setQuotes(payload.quotes);
+      const unavailable = payload.quotes.find(
+        (quote) => quote.dataMode === "unavailable",
+      );
+      setMessage(unavailable?.error ?? "");
       setCountdown(payload.refreshAfterSeconds);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "行情更新失敗");
@@ -99,7 +104,8 @@ export function MarketWorkspace({
         if (cancelled) return;
         setCandles(candlePayload.candles ?? []);
         setAnalysis(analysisPayload.error ? null : analysisPayload);
-        if (analysisPayload.error) setMessage(analysisPayload.error);
+        if (candlePayload.error || analysisPayload.error)
+          setMessage(candlePayload.error ?? analysisPayload.error);
       })
       .catch(() => !cancelled && setMessage("K 線或歷史分析載入失敗。"));
     return () => {
@@ -242,7 +248,9 @@ export function MarketWorkspace({
                   }
                 >
                   {change === null
-                    ? "讀取中"
+                    ? quote?.dataMode === "unavailable"
+                      ? "無正式資料"
+                      : "讀取中"
                     : `${change >= 0 ? "+" : ""}${formatNumber(change)}%`}
                 </em>
                 <small>{quote ? modeLabel(quote) : "等待行情"}</small>

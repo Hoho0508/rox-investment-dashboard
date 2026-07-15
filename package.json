@@ -19,6 +19,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "report:generate": "tsx scripts/generate-report.ts",
+    "report:midday": "tsx scripts/generate-report.ts midday",
+    "report:close": "tsx scripts/generate-report.ts close",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
   },
   "dependencies": {

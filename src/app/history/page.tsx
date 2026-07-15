@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getReportHistory } from "@/lib/reports/store";
+import { REPORT_DEFINITIONS, parseReportType } from "@/lib/reports/config";
 
 export const dynamic = "force-dynamic";
 export default async function HistoryPage() {
@@ -15,7 +16,9 @@ export default async function HistoryPage() {
         <div>
           <div className="eyebrow">Archive</div>
           <h1>歷史報告</h1>
-          <p className="muted">保留每日晨報與資料完整度，方便事後檢討。</p>
+          <p className="muted">
+            保留晨報、午盤與盤後報告，方便比較盤勢如何演變。
+          </p>
         </div>
       </div>
       <div className="card">
@@ -25,6 +28,7 @@ export default async function HistoryPage() {
               <thead>
                 <tr>
                   <th>日期</th>
+                  <th>類型</th>
                   <th>市場判斷</th>
                   <th>資料模式</th>
                   <th>完整度</th>
@@ -35,7 +39,17 @@ export default async function HistoryPage() {
                 {reports.map((report) => (
                   <tr key={report.id}>
                     <td>
-                      <Link href="/reports">{report.reportDate}</Link>
+                      <Link
+                        href={`/reports?type=${report.reportType}&date=${report.reportDate}`}
+                      >
+                        {report.reportDate}
+                      </Link>
+                    </td>
+                    <td>
+                      {
+                        REPORT_DEFINITIONS[parseReportType(report.reportType)]
+                          .label
+                      }
                     </td>
                     <td>{report.marketView}</td>
                     <td>{report.dataMode}</td>
@@ -53,7 +67,7 @@ export default async function HistoryPage() {
         ) : (
           <div className="empty">
             <h2>尚無已儲存報告</h2>
-            <p className="muted">執行 pnpm report:generate 產生第一份晨報。</p>
+            <p className="muted">到每日報告頁手動產生第一份報告。</p>
           </div>
         )}
       </div>

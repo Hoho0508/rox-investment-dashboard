@@ -4,6 +4,7 @@ import { MockMarketDataProvider } from "@/lib/providers/mock-market";
 
 afterEach(() => {
   delete process.env.FINMIND_API_TOKEN;
+  delete process.env.DATA_MODE;
   vi.restoreAllMocks();
 });
 
@@ -29,6 +30,20 @@ describe("FinMind 台股 Provider", () => {
     expect(
       stocks.find((stock) => stock.symbol === "2330")?.price.error,
     ).toContain("network down");
+  });
+
+  it("正式站嚴格模式失敗時不使用 Mock 補值", async () => {
+    process.env.DATA_MODE = "live";
+    process.env.FINMIND_API_TOKEN = "test-only-token";
+    const fetcher = vi.fn().mockRejectedValue(new Error("network down"));
+    const stocks = await new FinMindMarketDataProvider(
+      new MockMarketDataProvider(),
+      fetcher,
+    ).getCoreStocks();
+    const tsmc = stocks.find((stock) => stock.symbol === "2330")!;
+    expect(tsmc.price.value).toBeNull();
+    expect(tsmc.price.dataMode).toBe("unavailable");
+    expect(tsmc.price.sourceName).not.toContain("Mock");
   });
 
   it("成功時使用 FinMind 價格且不混入 Mock 基本面", async () => {

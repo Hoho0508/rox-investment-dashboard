@@ -11,3 +11,4 @@ test-results/
 *.db-journal
 src/generated/prisma/
 *.tsbuildinfo
+.DS_Store
