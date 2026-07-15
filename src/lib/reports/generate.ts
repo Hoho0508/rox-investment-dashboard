@@ -6,7 +6,11 @@ import { calculateExitWarning } from "@/lib/scoring/exit";
 import type { DailyReport } from "@/types/domain";
 import type { ReportType } from "@/lib/reports/config";
 
-function reportNarrative(reportType: ReportType, isTradingDay: boolean) {
+function reportNarrative(
+  reportType: ReportType,
+  isTradingDay: boolean,
+  scenarioModelAvailable: boolean,
+) {
   if (!isTradingDay) {
     return {
       keyPoints: [
@@ -20,6 +24,22 @@ function reportNarrative(reportType: ReportType, isTradingDay: boolean) {
         "等待正式資料確認",
         "避免預判開盤",
         "先問為什麼，再問買不買。",
+      ],
+    };
+  }
+  if (!scenarioModelAvailable) {
+    return {
+      keyPoints: [
+        "全球市場正式資料不足，暫不推定今日方向與波動",
+        "個股欄位只顯示已成功取得且可追溯來源的資料",
+        "補齊市場、新聞與基本面資料前，維持資料驗證狀態",
+      ],
+      conclusion:
+        "目前資料不足，無法形成可信的市場方向、情境機率或操作判斷；請先查看缺少資料清單。",
+      discipline: [
+        "不以缺漏資料推測盤勢",
+        "等待正式資料確認",
+        "先確認來源與時間，再閱讀分析。",
       ],
     };
   }
@@ -72,6 +92,70 @@ function reportNarrative(reportType: ReportType, isTradingDay: boolean) {
   };
 }
 
+function buildScenarios(scenarioModelAvailable: boolean) {
+  if (!scenarioModelAvailable) {
+    const unavailable = "資料不足，暫不進行情境推估";
+    return [
+      {
+        name: "偏多" as const,
+        probability: DEFAULT_SCENARIOS.bullish,
+        trigger: unavailable,
+        beneficiaries: "無法判斷",
+        pressured: "無法判斷",
+        coreImpact: "等待正式資料",
+        changeSignal: "補齊正式市場資料後重新計算",
+      },
+      {
+        name: "基準震盪" as const,
+        probability: DEFAULT_SCENARIOS.base,
+        trigger: unavailable,
+        beneficiaries: "無法判斷",
+        pressured: "無法判斷",
+        coreImpact: "等待正式資料",
+        changeSignal: "補齊正式市場資料後重新計算",
+      },
+      {
+        name: "偏空" as const,
+        probability: DEFAULT_SCENARIOS.bearish,
+        trigger: unavailable,
+        beneficiaries: "無法判斷",
+        pressured: "無法判斷",
+        coreImpact: "等待正式資料",
+        changeSignal: "補齊正式市場資料後重新計算",
+      },
+    ];
+  }
+  return [
+    {
+      name: "偏多" as const,
+      probability: DEFAULT_SCENARIOS.bullish,
+      trigger: "美債殖利率回落、半導體轉強",
+      beneficiaries: "大型電子、AI 供應鏈",
+      pressured: "防禦型資產",
+      coreImpact: "台積電、NVIDIA、鴻海情緒改善",
+      changeSignal: "市場廣度與成交量同步改善",
+    },
+    {
+      name: "基準震盪" as const,
+      probability: DEFAULT_SCENARIOS.base,
+      trigger: "利率高檔、企業展望未顯著改變",
+      beneficiaries: "基本面穩定個股",
+      pressured: "高估值題材股",
+      coreImpact: "核心標的區間整理",
+      changeSignal: "美元、殖利率或公司消息突破近期區間",
+    },
+    {
+      name: "偏空" as const,
+      probability: DEFAULT_SCENARIOS.bearish,
+      trigger: "殖利率急升或 AI CapEx 下修",
+      beneficiaries: "現金與低波動族群",
+      pressured: "半導體與高估值成長股",
+      coreImpact: "核心標的短線承壓，先複核基本面",
+      changeSignal: "公司展望下修或資金明顯撤出",
+    },
+  ];
+}
+
 export async function generateReport(
   reportType: ReportType,
   now = new Date(),
@@ -82,13 +166,15 @@ export async function generateReport(
     provider.getGlobalMarkets(),
     provider.getCoreStocks(),
   ]);
-  const latestDataAt =
-    globalMarkets
-      .map((item) => item.price.fetchedAt)
-      .sort()
-      .at(-1) ?? now.toISOString();
   const isTradingDay = isTaiwanTradingDay(now);
-  const narrative = reportNarrative(reportType, isTradingDay);
+  const scenarioModelAvailable = globalMarkets.some(
+    (item) => item.price.value !== null && item.changePercent.value !== null,
+  );
+  const narrative = reportNarrative(
+    reportType,
+    isTradingDay,
+    scenarioModelAvailable,
+  );
   const fallbackErrors = coreStocks.flatMap((stock) =>
     stock.price.error ? [`${stock.symbol}：${stock.price.error}`] : [],
   );
@@ -103,6 +189,12 @@ export async function generateReport(
     ...globalMarkets.map((item) => item.price),
     ...coreStocks.map((item) => item.price),
   ];
+  const latestDataAt =
+    allPoints
+      .map((item) => item.fetchedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? now.toISOString();
   const reportDataMode =
     allPoints.some((item) => item.dataMode === "unavailable") ||
     allPoints.length === 0
@@ -126,9 +218,9 @@ export async function generateReport(
         100,
     ),
     isTradingDay,
-    marketView: "震盪",
-    confidence: 68,
-    volatility: "中",
+    marketView: scenarioModelAvailable ? "震盪" : "資料不足",
+    confidence: scenarioModelAvailable ? 68 : 0,
+    volatility: scenarioModelAvailable ? "中" : "未知",
     keyPoints: narrative.keyPoints,
     conclusion: narrative.conclusion,
     globalMarkets,
@@ -137,66 +229,50 @@ export async function generateReport(
       entry: calculateEntryScore(stock),
       exit: calculateExitWarning(stock),
     })),
-    scenarios: [
-      {
-        name: "偏多",
-        probability: DEFAULT_SCENARIOS.bullish,
-        trigger: "美債殖利率回落、半導體轉強",
-        beneficiaries: "大型電子、AI 供應鏈",
-        pressured: "防禦型資產",
-        coreImpact: "台積電、NVIDIA、鴻海情緒改善",
-        changeSignal: "市場廣度與成交量同步改善",
-      },
-      {
-        name: "基準震盪",
-        probability: DEFAULT_SCENARIOS.base,
-        trigger: "利率高檔、企業展望未顯著改變",
-        beneficiaries: "基本面穩定個股",
-        pressured: "高估值題材股",
-        coreImpact: "核心標的區間整理",
-        changeSignal: "美元、殖利率或公司消息突破近期區間",
-      },
-      {
-        name: "偏空",
-        probability: DEFAULT_SCENARIOS.bearish,
-        trigger: "殖利率急升或 AI CapEx 下修",
-        beneficiaries: "現金與低波動族群",
-        pressured: "半導體與高估值成長股",
-        coreImpact: "核心標的短線承壓，先複核基本面",
-        changeSignal: "公司展望下修或資金明顯撤出",
-      },
-    ],
-    risks: [
-      {
-        name: "美債殖利率上升",
-        probability: "中",
-        impact: "高",
-        affected: ["NVDA", "2330"],
-        monitor: "美國 10 年期殖利率",
-        invalidation: "殖利率回落且通膨預期下降",
-      },
-      {
-        name: "AI 資本支出低於預期",
-        probability: "低",
-        impact: "高",
-        affected: ["NVDA", "2330", "2317"],
-        monitor: "雲端業者 CapEx 與公司展望",
-        invalidation: "主要雲端業者持續上修資本支出",
-      },
-      {
-        name: "資料延遲與不完整",
-        probability: "高",
-        impact: "中",
-        affected: ["全部標的"],
-        monitor: "資料來源與更新時間",
-        invalidation: "正式來源資料完整且通過日期驗證",
-      },
-    ],
+    scenarioModelAvailable,
+    scenarios: buildScenarios(scenarioModelAvailable),
+    risks: scenarioModelAvailable
+      ? [
+          {
+            name: "美債殖利率上升",
+            probability: "中" as const,
+            impact: "高" as const,
+            affected: ["NVDA", "2330"],
+            monitor: "美國 10 年期殖利率",
+            invalidation: "殖利率回落且通膨預期下降",
+          },
+          {
+            name: "AI 資本支出低於預期",
+            probability: "低" as const,
+            impact: "高" as const,
+            affected: ["NVDA", "2330", "2317"],
+            monitor: "雲端業者 CapEx 與公司展望",
+            invalidation: "主要雲端業者持續上修資本支出",
+          },
+          {
+            name: "資料延遲與不完整",
+            probability: "高" as const,
+            impact: "中" as const,
+            affected: ["全部標的"],
+            monitor: "資料來源與更新時間",
+            invalidation: "正式來源資料完整且通過日期驗證",
+          },
+        ]
+      : [
+          {
+            name: "資料延遲與不完整",
+            probability: "高",
+            impact: "高",
+            affected: ["全部標的"],
+            monitor: "資料來源、日期與完整度",
+            invalidation: "正式來源資料完整且通過日期驗證",
+          },
+        ],
     events: [
       {
         time: "未設定",
         name: "經濟事件資料待 Live provider 串接",
-        importance: "中",
+        importance: scenarioModelAvailable ? "中" : "未知",
         affected: "科技股與大盤",
       },
     ],

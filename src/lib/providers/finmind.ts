@@ -1,9 +1,12 @@
 import { subDays } from "date-fns";
 import { z } from "zod";
+import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
+import { FugleRealtimeTaiwanProvider } from "@/lib/market/fugle";
 import type { MarketDataProvider } from "@/lib/providers/contracts";
 import { MockMarketDataProvider } from "@/lib/providers/mock-market";
 import { taipeiDate } from "@/lib/reports/calendar";
-import type { StockSnapshot } from "@/types/domain";
+import type { DataMode, StockSnapshot } from "@/types/domain";
+import type { LiveQuote } from "@/types/market";
 
 const FINMIND_DATA_URL = "https://api.finmindtrade.com/api/v4/data";
 
@@ -20,16 +23,23 @@ const finMindResponseSchema = z.object({
   ),
 });
 
+type RealtimeQuoteProvider = Pick<RealtimeTaiwanMarketProvider, "getQuotes">;
+type StockFetchResult =
+  | { kind: "success"; stock: StockSnapshot }
+  | { kind: "failure"; template: StockSnapshot; reason: string };
+
 export class FinMindMarketDataProvider implements MarketDataProvider {
-  readonly mode = process.env.FINMIND_API_TOKEN
-    ? ("live" as const)
-    : process.env.DATA_MODE === "live"
-      ? ("unavailable" as const)
-      : ("mock" as const);
+  readonly mode =
+    process.env.FINMIND_API_TOKEN || process.env.FUGLE_MARKETDATA_API_KEY
+      ? ("live" as const)
+      : process.env.DATA_MODE === "live"
+        ? ("unavailable" as const)
+        : ("mock" as const);
 
   constructor(
     private readonly fallback: MarketDataProvider = new MockMarketDataProvider(),
     private readonly fetcher: typeof fetch = fetch,
+    private readonly injectedRealtimeProvider?: RealtimeQuoteProvider,
   ) {}
 
   async getGlobalMarkets() {
@@ -39,27 +49,16 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
   }
 
   async getCoreStocks(): Promise<StockSnapshot[]> {
-    const mockStocks = await this.fallback.getCoreStocks();
+    const templates = await this.fallback.getCoreStocks();
     const token = process.env.FINMIND_API_TOKEN;
-    if (!token)
-      return mockStocks.map((stock) =>
-        process.env.DATA_MODE === "live"
-          ? this.markUnavailable(
-              stock,
-              stock.market === "TW"
-                ? "未設定 FINMIND_API_TOKEN，未顯示替代數值。"
-                : "美股正式行情 Provider 尚未串接，未顯示替代數值。",
-            )
-          : stock.market === "TW"
-            ? this.markFallback(
-                stock,
-                "未設定 FINMIND_API_TOKEN，已使用 Mock Data。",
-              )
-            : stock,
-      );
+    const realtimeProvider = this.resolveRealtimeProvider();
 
-    return Promise.all(
-      mockStocks.map(async (stock) => {
+    if (!token) {
+      const realtimeStocks = await this.fetchRealtimeStocks(
+        templates.filter((stock) => stock.market === "TW"),
+        realtimeProvider,
+      );
+      return templates.map((stock) => {
         if (stock.market !== "TW")
           return process.env.DATA_MODE === "live"
             ? this.markUnavailable(
@@ -67,22 +66,127 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
                 "美股正式行情 Provider 尚未串接，未顯示替代數值。",
               )
             : stock;
+        const realtime = realtimeStocks.get(stock.symbol);
+        if (realtime) return realtime;
+        return process.env.DATA_MODE === "live"
+          ? this.markUnavailable(
+              stock,
+              realtimeProvider
+                ? "未設定 FINMIND_API_TOKEN，且 Fugle 暫時無可用報價；未顯示替代數值。"
+                : "未設定 FINMIND_API_TOKEN 或 FUGLE_MARKETDATA_API_KEY，未顯示替代數值。",
+            )
+          : this.markFallback(
+              stock,
+              "未設定 FINMIND_API_TOKEN，已使用 Mock Data。",
+            );
+      });
+    }
+
+    const results: StockFetchResult[] = await Promise.all(
+      templates.map(async (stock): Promise<StockFetchResult> => {
+        if (stock.market !== "TW")
+          return {
+            kind: "success",
+            stock:
+              process.env.DATA_MODE === "live"
+                ? this.markUnavailable(
+                    stock,
+                    "美股正式行情 Provider 尚未串接，未顯示替代數值。",
+                  )
+                : stock,
+          };
         try {
-          return await this.fetchTaiwanStock(stock, token);
+          return {
+            kind: "success",
+            stock: await this.fetchTaiwanStock(stock, token),
+          };
         } catch (error) {
           const reason = error instanceof Error ? error.message : "未知錯誤";
-          return process.env.DATA_MODE === "live"
-            ? this.markUnavailable(
-                stock,
-                `FinMind 取得失敗，未顯示替代數值：${reason}`,
-              )
-            : this.markFallback(
-                stock,
-                `FinMind 取得失敗，已使用 Mock Data：${reason}`,
-              );
+          return { kind: "failure", template: stock, reason };
         }
       }),
     );
+    const realtimeStocks = await this.fetchRealtimeStocks(
+      results.flatMap((result) =>
+        result.kind === "failure" ? [result.template] : [],
+      ),
+      realtimeProvider,
+    );
+    return results.map((result) => {
+      if (result.kind === "success") return result.stock;
+      const realtime = realtimeStocks.get(result.template.symbol);
+      if (realtime) return realtime;
+      return process.env.DATA_MODE === "live"
+        ? this.markUnavailable(
+            result.template,
+            `FinMind 取得失敗，且 Fugle 無可用報價；未顯示替代數值：${result.reason}`,
+          )
+        : this.markFallback(
+            result.template,
+            `FinMind 取得失敗，已使用 Mock Data：${result.reason}`,
+          );
+    });
+  }
+
+  private resolveRealtimeProvider(): RealtimeQuoteProvider | undefined {
+    if (this.injectedRealtimeProvider) return this.injectedRealtimeProvider;
+    const apiKey = process.env.FUGLE_MARKETDATA_API_KEY;
+    return apiKey ? new FugleRealtimeTaiwanProvider(apiKey) : undefined;
+  }
+
+  private async fetchRealtimeStocks(
+    templates: StockSnapshot[],
+    provider: RealtimeQuoteProvider | undefined,
+  ) {
+    const stocks = new Map<string, StockSnapshot>();
+    if (!provider || templates.length === 0) return stocks;
+    try {
+      const quotes = await provider.getQuotes(
+        templates.map((stock) => stock.symbol),
+      );
+      const templateBySymbol = new Map(
+        templates.map((stock) => [stock.symbol, stock]),
+      );
+      for (const quote of quotes) {
+        const template = templateBySymbol.get(quote.symbol);
+        if (template && quote.dataMode === "live" && quote.price !== null)
+          stocks.set(quote.symbol, this.fromRealtimeQuote(template, quote));
+      }
+    } catch {
+      // 呼叫端會以 unavailable 或清楚標示的 Mock fallback 收尾。
+    }
+    return stocks;
+  }
+
+  private fromRealtimeQuote(
+    template: StockSnapshot,
+    quote: LiveQuote,
+  ): StockSnapshot {
+    const priceMode: DataMode = quote.dataMode;
+    return {
+      ...template,
+      name: quote.name || template.name,
+      price: {
+        value: quote.price,
+        sourceName: quote.sourceName,
+        sourceUrl: quote.sourceUrl,
+        fetchedAt: quote.asOf,
+        marketDate: quote.asOf.slice(0, 10),
+        isDelayed: quote.isDelayed,
+        dataMode: priceMode,
+        confidence: quote.isDelayed ? 86 : 94,
+      },
+      dayChangePercent: quote.changePercent,
+      // Fugle 行情不包含基本面；不得沿用 Mock 基本面。
+      revenueGrowth: null,
+      epsGrowth: null,
+      grossMarginTrend: null,
+      freeCashFlowTrend: null,
+      forwardPe: null,
+      outlook: "未知",
+      thesisIntact: null,
+      majorRisk: `${template.majorRisk}；Fugle 僅提供行情，基本面資料尚未串接`,
+    };
   }
 
   private async fetchTaiwanStock(
@@ -168,7 +272,7 @@ export class FinMindMarketDataProvider implements MarketDataProvider {
         confidence: 0,
         error,
       },
-      dayChangePercent: 0,
+      dayChangePercent: null,
       revenueGrowth: null,
       epsGrowth: null,
       grossMarginTrend: null,

@@ -71,8 +71,12 @@ export function ReportView({ report }: { report: DailyReport }) {
         </div>
         <div className="card">
           <div className="label">規則模型信心</div>
-          <div className="metric">{report.confidence}</div>
-          <div className="source">滿分 100</div>
+          <div className="metric">
+            {report.scenarioModelAvailable ? report.confidence : "—"}
+          </div>
+          <div className="source">
+            {report.scenarioModelAvailable ? "滿分 100" : "資料不足，未評分"}
+          </div>
         </div>
         <div className="card">
           <div className="label">預期波動</div>
@@ -98,9 +102,17 @@ export function ReportView({ report }: { report: DailyReport }) {
           {report.scenarios.map((item) => (
             <article className="card scenario" key={item.name}>
               <div className="label">{item.name}情境</div>
-              <div className="metric">{item.probability}%</div>
+              <div className="metric">
+                {report.scenarioModelAvailable ? `${item.probability}%` : "—"}
+              </div>
               <div className="bar">
-                <span style={{ width: `${item.probability}%` }} />
+                <span
+                  style={{
+                    width: report.scenarioModelAvailable
+                      ? `${item.probability}%`
+                      : "0%",
+                  }}
+                />
               </div>
               <p>{item.trigger}</p>
               <p className="source">核心影響：{item.coreImpact}</p>
@@ -108,7 +120,9 @@ export function ReportView({ report }: { report: DailyReport }) {
           ))}
         </div>
         <p className="source">
-          情境為規則模型推估，不是保證；三種機率合計 100%。
+          {report.scenarioModelAvailable
+            ? "情境為規則模型推估，不是保證；三種機率合計 100%。"
+            : "正式輸入資料不足，情境機率暫不顯示，也不做方向推估。"}
         </p>
       </section>
       <section className="card section">
@@ -182,7 +196,13 @@ export function ReportView({ report }: { report: DailyReport }) {
                   <td>
                     {stock.exit.score} · {stock.exit.label}
                   </td>
-                  <td>{stock.thesisIntact ? "仍待持續驗證" : "需重新檢查"}</td>
+                  <td>
+                    {stock.thesisIntact === null
+                      ? "資料不足"
+                      : stock.thesisIntact
+                        ? "仍待持續驗證"
+                        : "需重新檢查"}
+                  </td>
                   <td>{stock.majorRisk}</td>
                 </tr>
               ))}

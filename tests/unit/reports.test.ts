@@ -35,6 +35,15 @@ describe("晨報生成", () => {
   it("Mock 模式明確標示", async () =>
     expect((await generateMorningReport()).dataMode).toBe("mock"));
 
+  it("本機缺少 Live 金鑰時仍可用 Mock 完成報告介面", async () => {
+    const report = await generateMorningReport();
+    expect(report.scenarioModelAvailable).toBe(true);
+    expect(report.marketView).toBe("震盪");
+    expect(report.stocks.every((stock) => stock.price.value !== null)).toBe(
+      true,
+    );
+  });
+
   it("晨報、午盤與盤後使用相同契約且內容依時段調整", async () => {
     const [morning, midday, close] = await Promise.all([
       generateReport("morning"),
@@ -66,5 +75,12 @@ describe("晨報生成", () => {
     expect(
       report.stocks.every((stock) => !stock.price.sourceName.includes("Mock")),
     ).toBe(true);
+    expect(report.scenarioModelAvailable).toBe(false);
+    expect(report.marketView).toBe("資料不足");
+    expect(report.volatility).toBe("未知");
+    expect(report.confidence).toBe(0);
+    expect(report.conclusion).toContain("目前資料不足");
+    expect(report.conclusion).not.toContain("科技股情緒偏弱");
+    expect(validateScenarioTotal(report)).toBe(true);
   });
 });

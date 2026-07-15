@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FinMindMarketDataProvider } from "@/lib/providers/finmind";
 import { MockMarketDataProvider } from "@/lib/providers/mock-market";
+import type { LiveQuote } from "@/types/market";
 
 afterEach(() => {
   delete process.env.FINMIND_API_TOKEN;
+  delete process.env.FUGLE_MARKETDATA_API_KEY;
   delete process.env.DATA_MODE;
   vi.restoreAllMocks();
 });
@@ -44,6 +46,46 @@ describe("FinMind 台股 Provider", () => {
     expect(tsmc.price.value).toBeNull();
     expect(tsmc.price.dataMode).toBe("unavailable");
     expect(tsmc.price.sourceName).not.toContain("Mock");
+  });
+
+  it("正式站缺少 FinMind 時使用 Fugle 真實台股報價", async () => {
+    process.env.DATA_MODE = "live";
+    const getQuotes = vi.fn(async (symbols: string[]) =>
+      symbols.map((symbol): LiveQuote => ({
+        symbol,
+        name: symbol === "2330" ? "台積電" : "鴻海",
+        exchange: "TWSE",
+        market: "TW",
+        price: symbol === "2330" ? 1115 : 205,
+        previousClose: null,
+        open: null,
+        high: null,
+        low: null,
+        change: null,
+        changePercent: symbol === "2330" ? 1.36 : null,
+        volume: null,
+        asOf: "2026-07-15T05:30:00.000Z",
+        sourceName: "Fugle 即時行情",
+        sourceUrl: `https://api.fugle.tw/${symbol}`,
+        dataMode: "live",
+        isDelayed: false,
+        status: "open",
+      })),
+    );
+    const stocks = await new FinMindMarketDataProvider(
+      new MockMarketDataProvider(),
+      vi.fn(),
+      { getQuotes },
+    ).getCoreStocks();
+    const tsmc = stocks.find((stock) => stock.symbol === "2330")!;
+    expect(getQuotes).toHaveBeenCalledWith(["2330", "2317"]);
+    expect(tsmc.price.value).toBe(1115);
+    expect(tsmc.price.sourceName).toContain("Fugle");
+    expect(tsmc.price.dataMode).toBe("live");
+    expect(tsmc.epsGrowth).toBeNull();
+    expect(stocks.find((stock) => stock.symbol === "NVDA")?.price.value).toBe(
+      null,
+    );
   });
 
   it("成功時使用 FinMind 價格且不混入 Mock 基本面", async () => {

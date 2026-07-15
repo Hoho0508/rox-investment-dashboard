@@ -10,6 +10,9 @@ function parseStoredReport(payload: string, id: string): DailyReport {
     ...parsed,
     id,
     reportType: parsed.reportType ?? "morning",
+    scenarioModelAvailable:
+      parsed.scenarioModelAvailable ??
+      Boolean(parsed.globalMarkets?.some((item) => item.price.value !== null)),
   } as DailyReport;
 }
 

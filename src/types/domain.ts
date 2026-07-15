@@ -1,5 +1,5 @@
 export type DataMode = "mock" | "manual" | "live" | "unavailable";
-export type Level = "低" | "中" | "高";
+export type Level = "低" | "中" | "高" | "未知";
 
 export type DataPoint<T> = {
   value: T | null;
@@ -27,7 +27,7 @@ export type StockSnapshot = {
   name: string;
   market: "TW" | "US";
   price: DataPoint<number>;
-  dayChangePercent: number;
+  dayChangePercent: number | null;
   revenueGrowth: number | null;
   epsGrowth: number | null;
   grossMarginTrend: number | null;
@@ -79,13 +79,14 @@ export type MorningReport = {
   dataMode: DataMode;
   completeness: number;
   isTradingDay: boolean;
-  marketView: "偏多" | "中性偏多" | "震盪" | "中性偏空" | "偏空";
+  marketView: "偏多" | "中性偏多" | "震盪" | "中性偏空" | "偏空" | "資料不足";
   confidence: number;
   volatility: Level;
   keyPoints: string[];
   conclusion: string;
   globalMarkets: MarketQuote[];
   stocks: Array<StockSnapshot & { entry: ScoreResult; exit: ScoreResult }>;
+  scenarioModelAvailable: boolean;
   scenarios: Scenario[];
   risks: RiskItem[];
   events: Array<{

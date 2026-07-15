@@ -1,6 +1,6 @@
 # Rox Investment Dashboard
 
-V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)。
+V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)；需要專案擁有者親自完成的外部設定集中在 [`SETUP_REQUIRED.md`](./SETUP_REQUIRED.md)。每輪自主巡查記錄於 [`AUTONOMOUS_RUN_LOG.md`](./AUTONOMOUS_RUN_LOG.md)，顯著變更與待核准構想分別記錄於 [`CHANGELOG.md`](./CHANGELOG.md) 與 [`PROPOSALS.md`](./PROPOSALS.md)。
 
 供投資初學者使用的繁體中文市場晨報、資料來源追蹤、條件評分與投資紀律工具。系統不下單、不預測精確價格，也不提供保證獲利的訊號。
 
@@ -52,6 +52,8 @@ tests/               Vitest 與 Playwright 測試
 ## 本機啟動
 
 需要 Node.js 20.19+、pnpm 與 PostgreSQL 連線。建議先從 Vercel Marketplace 建立 Neon，再將它提供的連線字串放入本機 `.env` 的 `DATABASE_URL`。專案使用 `pnpm-lock.yaml`，不要混用 npm/yarn 或產生其他 lockfile。
+
+不想處理第三方登入時，將 `DATA_MODE=mock` 保持不變即可繼續所有介面與測試開發；缺少 FinMind／Fugle Key 不會讓網站崩潰，也不需要停下來等待授權。
 
 ```bash
 cp .env.example .env
@@ -138,11 +140,13 @@ REPORT_MAX_RETRIES=2
 
 Mock provider 僅供本機開發與自動測試。正式環境 `DATA_MODE=live` 時，報告、市場脈動、即時報價與 K 線都禁止用 Mock 補值；這能避免網站中斷，但缺少正式來源的欄位會保持空白。
 
+Live 報告缺少全球市場正式輸入時，市場方向、波動、模型信心與情境機率會顯示資料不足，不會用固定敘事冒充即時分析。三情境的內部資料契約仍維持合計 100%，但輸入不足時 UI 不顯示該組數字。
+
 ## 手機 App
 
 網站提供 PWA manifest、App 圖示與只快取靜態資源的 service worker。登入後前往 `/install`：iPhone／iPad 使用 Safari 的「分享 → 加入主畫面」，Android 使用 Chrome 的「安裝應用程式」。PWA 不快取私人報告、行情或 API 回應，離線時不會拿舊資料冒充即時行情。
 
-台股日成交價由 `src/lib/providers/finmind.ts` 與 `src/lib/market/finmind-market.ts` 透過 FinMind 取得。Token 只讀取 server-side 的 `process.env.FINMIND_API_TOKEN`；本機 Mock 模式可安全降級供測試，但正式 Live 模式遇到沒有 Token、逾時、額度不足、HTTP 錯誤、空資料或格式異常時只顯示缺少原因，不提供替代數值。FinMind 日資料為盤後更新且標示延遲，不冒充盤中即時行情。
+台股日成交價由 `src/lib/providers/finmind.ts` 與 `src/lib/market/finmind-market.ts` 透過 FinMind 取得。Token 只讀取 server-side 的 `process.env.FINMIND_API_TOKEN`。晨報缺少 FinMind Token 或 FinMind 暫時失敗時，若已有 `FUGLE_MARKETDATA_API_KEY`，會改用 Fugle 的真實台股報價，並把基本面欄位保持空白；兩個正式來源都不可用時才顯示資料不足。本機 Mock 模式仍可安全降級供測試。FinMind 日資料為盤後更新且標示延遲，不冒充盤中即時行情。
 
 盤中即時台股由 `src/lib/market/fugle.ts` 透過 Fugle Intraday Quote 取得，金鑰只讀取 `process.env.FUGLE_MARKETDATA_API_KEY`。前端永遠只呼叫本站受登入保護的 API route，不會接觸供應商金鑰。行情每 15 至 30 秒更新一次並提供手動更新；自選清單保存於 PostgreSQL。沒有 Fugle Key 時可顯示 FinMind 最新交易日收盤價並標示「延遲行情」；兩者都失敗時正式站顯示資料 unavailable。
 
