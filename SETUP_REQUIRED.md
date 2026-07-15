@@ -40,6 +40,7 @@
 
 ## 不需要現在處理
 
+- TWSE OpenAPI 與 U.S. Treasury XML Feed 不需要帳號、Token 或付費設定；部署環境只需允許正常的 outbound HTTPS。
 - 美股即時行情、新聞、完整基本面與法人籌碼 Provider 尚未選定，不需要註冊新服務。
 - Tick 串流尚未啟用，不需要購買行情方案。
 - 本次不修改帳號權限、不購買方案、不部署正式環境。

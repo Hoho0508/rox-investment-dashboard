@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### Official Cross-Market Context
+
+- 新增免登入、免付費的官方跨市場 Provider：臺灣證券交易所 OpenAPI 提供 TAIEX、臺灣 50、臺灣資訊科技指數；美國財政部 XML Feed 提供 2 年與 10 年公債殖利率。
+- Live 晨報以 TAIEX、TWTECH、US10Y 作為最小情境資料門檻，摘要直接引用實際漲跌；任一缺漏仍 fail closed，不用 Mock 或固定敘事補值。
+- 部分欄位 unavailable、但已有可用正式資料時，報告保留成功資料的 DELAYED／STALE 模式，不再把整份報告錯標成 unavailable。
+- 官方來源失敗時產生逐項 unavailable，若 process-memory 中有上一筆成功資料則由既有 stale wrapper 接手。
+- 新增官方 JSON／XML parsing、來源失敗、無 Mock fallback 與 Live 報告可用性的 deterministic tests。
+
 ### Phase 2 — Live／Mock Separation
 
 - 新增六態 `DataMode`、統一 `DataEnvelope<T>`、runtime mode resolver、結構化 Provider 錯誤與集中 Provider Factory。

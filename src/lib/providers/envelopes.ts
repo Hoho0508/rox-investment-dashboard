@@ -40,10 +40,12 @@ export function deriveAggregateDataMode(
 ): DataMode {
   if (envelopes.length === 0) return "unavailable";
   if (envelopes.some((item) => item.dataMode === "mock")) return "mock";
-  if (envelopes.some((item) => item.dataMode === "unavailable"))
-    return "unavailable";
-  if (envelopes.some((item) => item.dataMode === "stale")) return "stale";
-  if (envelopes.some((item) => item.dataMode === "manual")) return "manual";
-  if (envelopes.some((item) => item.dataMode === "delayed")) return "delayed";
+  const available = envelopes.filter(
+    (item) => item.value !== null && item.dataMode !== "unavailable",
+  );
+  if (available.length === 0) return "unavailable";
+  if (available.some((item) => item.dataMode === "stale")) return "stale";
+  if (available.some((item) => item.dataMode === "manual")) return "manual";
+  if (available.some((item) => item.dataMode === "delayed")) return "delayed";
   return "live";
 }

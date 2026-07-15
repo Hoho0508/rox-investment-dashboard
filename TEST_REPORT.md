@@ -2,6 +2,21 @@
 
 執行日期：2026-07-15。所有驗證均在本機 repository 執行，沒有連線或修改 Vercel Production。
 
+## 官方跨市場資料模組
+
+| Command             | Result | Evidence                                                        |
+| ------------------- | ------ | --------------------------------------------------------------- |
+| `pnpm format:check` | PASS   | Prettier 全部符合（由 `pnpm check` 執行）。                     |
+| `pnpm lint`         | PASS   | ESLint 0 warnings（由 `pnpm check` 執行）。                     |
+| `pnpm typecheck`    | PASS   | TypeScript noEmit 通過（由 `pnpm check` 執行）。                |
+| `pnpm test`         | PASS   | 10 files、53 tests。                                            |
+| `pnpm test:e2e`     | PASS   | Desktop Chrome + iPhone 13，共 16 tests，13.3 秒。              |
+| `pnpm build`        | PASS   | Next.js 16.2.10，17 個 app pages/routes 完成 production build。 |
+
+另執行一次不含秘密值的實際官方來源 smoke test：TWSE TAIEX／臺灣50／科技指數與 U.S. Treasury 2Y／10Y 均成功取得 2026-07-14 資料並標示 `delayed`。`DATA_MODE=live`、未提供 FinMind Token 的安全驗證結果為：`dataMode=delayed`、`scenarioModelAvailable=true`、`marketView=中性偏空`、`completeness=33`；若正式環境的 FinMind 台股價格同時成功，完整度會再依有效欄位增加。
+
+第一次 smoke test 指令使用 `tsx -e` top-level await，因 CJS eval 模式不支援而在發出網路請求前停止；改用 async function 包裝後成功。這是驗證指令寫法問題，不是 Provider 或應用程式失敗。
+
 ## Phase 2 最終結果
 
 | Command             | Result | Evidence                                             |

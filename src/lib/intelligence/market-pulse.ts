@@ -43,21 +43,29 @@ export function buildMarketPulse(report: MorningReport): MarketPulse {
       item.changePercent.value ?? 0,
     ]),
   );
-  const score = clamp(
-    52 +
-      (changes.SPX ?? 0) * 4 +
-      (changes.IXIC ?? 0) * 4 +
-      (changes.SOX ?? 0) * 3 -
-      Math.max(0, changes.VIX ?? 0) * 1.5,
+  const hasLegacySentimentInputs = ["SPX", "IXIC", "SOX", "VIX"].every(
+    (symbol) => changes[symbol] !== undefined,
   );
+  const score =
+    report.dataMode === "mock" || hasLegacySentimentInputs
+      ? clamp(
+          52 +
+            (changes.SPX ?? 0) * 4 +
+            (changes.IXIC ?? 0) * 4 +
+            (changes.SOX ?? 0) * 3 -
+            Math.max(0, changes.VIX ?? 0) * 1.5,
+        )
+      : null;
   const label =
-    score >= 70
-      ? "偏樂觀"
-      : score >= 55
-        ? "中性偏多"
-        : score >= 40
-          ? "觀望"
-          : "偏保守";
+    score === null
+      ? report.marketView
+      : score >= 70
+        ? "偏樂觀"
+        : score >= 55
+          ? "中性偏多"
+          : score >= 40
+            ? "觀望"
+            : "偏保守";
   const technologyDirection =
     (changes.SOX ?? 0) + (changes.IXIC ?? 0) > 0 ? "↑" : "↓";
   return {
@@ -101,6 +109,8 @@ export function buildMarketPulse(report: MorningReport): MarketPulse {
         ? "族群、資金流與市場主題為版型示範，不代表今日真實市場。"
         : report.dataMode === "stale"
           ? "行情更新失敗，市場情緒使用上一筆成功資料；族群與資金流仍 unavailable。"
-          : "族群與資金流 Provider 尚未串接，相關欄位保持 unavailable。",
+          : score === null
+            ? "市場方向使用 TWSE 與 U.S. Treasury 延遲資料；數字情緒分數尚未用未校準權重推算。族群與資金流仍 unavailable。"
+            : "族群與資金流 Provider 尚未串接，相關欄位保持 unavailable。",
   };
 }

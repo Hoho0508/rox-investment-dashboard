@@ -5,13 +5,45 @@ import { deriveAggregateDataMode } from "@/lib/providers/envelopes";
 import { isTaiwanTradingDay, taipeiDate } from "@/lib/reports/calendar";
 import { calculateEntryScore } from "@/lib/scoring/entry";
 import { calculateExitWarning } from "@/lib/scoring/exit";
-import type { DailyReport } from "@/types/domain";
+import type { DailyReport, MarketQuote } from "@/types/domain";
 import type { ReportType } from "@/lib/reports/config";
+
+const REQUIRED_SCENARIO_SYMBOLS = ["TAIEX", "TWTECH", "US10Y"] as const;
+
+function changeOf(markets: MarketQuote[], symbol: string) {
+  return markets.find((item) => item.symbol === symbol)?.changePercent.value;
+}
+
+function movement(label: string, value: number | null | undefined) {
+  if (value === null || value === undefined) return `${label}資料 unavailable`;
+  if (value > 0) return `${label}最近交易日上漲 ${value.toFixed(2)}%`;
+  if (value < 0) return `${label}最近交易日下跌 ${Math.abs(value).toFixed(2)}%`;
+  return `${label}最近交易日持平`;
+}
+
+function marketViewFromOfficialData(
+  globalMarkets: MarketQuote[],
+): DailyReport["marketView"] {
+  const equityChanges = [
+    changeOf(globalMarkets, "TAIEX"),
+    changeOf(globalMarkets, "TWTECH"),
+  ].filter((value): value is number => value !== null && value !== undefined);
+  if (equityChanges.length === 0) return "資料不足";
+  const average =
+    equityChanges.reduce((total, value) => total + value, 0) /
+    equityChanges.length;
+  if (average >= 2) return "偏多";
+  if (average >= 0.5) return "中性偏多";
+  if (average <= -2) return "偏空";
+  if (average <= -0.5) return "中性偏空";
+  return "震盪";
+}
 
 function reportNarrative(
   reportType: ReportType,
   isTradingDay: boolean,
   scenarioModelAvailable: boolean,
+  globalMarkets: MarketQuote[],
 ) {
   if (!isTradingDay) {
     return {
@@ -29,6 +61,14 @@ function reportNarrative(
       ],
     };
   }
+  const taiexChange = changeOf(globalMarkets, "TAIEX");
+  const technologyChange = changeOf(globalMarkets, "TWTECH");
+  const tenYearChange = changeOf(globalMarkets, "US10Y");
+  const officialEvidence = [
+    movement("臺灣加權指數", taiexChange),
+    movement("臺灣資訊科技指數", technologyChange),
+    movement("美國 10 年期公債殖利率", tenYearChange),
+  ];
   if (!scenarioModelAvailable) {
     return {
       keyPoints: [
@@ -78,13 +118,8 @@ function reportNarrative(
     };
   }
   return {
-    keyPoints: [
-      "美國科技與半導體類股短線整理",
-      "美元與長端殖利率偏強",
-      "台股電子權值股可能主導盤勢",
-    ],
-    conclusion:
-      "科技股情緒偏弱、殖利率上升，台股較可能震盪；核心公司的長期基本面需以正式財報持續驗證。",
+    keyPoints: officialEvidence,
+    conclusion: `${officialEvidence.join("；")}。以上為盤後延遲資料的條件整理，不代表下一交易日方向。`,
     discipline: [
       "等待正式資料確認",
       "避免追高",
@@ -169,13 +204,26 @@ export async function generateReport(
     provider.getCoreStocks(),
   ]);
   const isTradingDay = isTaiwanTradingDay(now);
-  const scenarioModelAvailable = globalMarkets.some(
-    (item) => item.price.value !== null && item.changePercent.value !== null,
-  );
+  const scenarioModelAvailable =
+    resolution.mode === "mock"
+      ? globalMarkets.some(
+          (candidate) =>
+            candidate.price.value !== null &&
+            candidate.changePercent.value !== null,
+        )
+      : REQUIRED_SCENARIO_SYMBOLS.every((symbol) =>
+          globalMarkets.some(
+            (candidate) =>
+              candidate.symbol === symbol &&
+              candidate.price.value !== null &&
+              candidate.changePercent.value !== null,
+          ),
+        );
   const narrative = reportNarrative(
     reportType,
     isTradingDay,
     scenarioModelAvailable,
+    globalMarkets,
   );
   const providerErrors = coreStocks.flatMap((stock) =>
     stock.price.errorMessage
@@ -184,8 +232,8 @@ export async function generateReport(
   );
   const missingData = [
     resolution.warning,
-    globalMarkets.length === 0
-      ? "全球市場正式資料 Provider 尚未串接；未使用 Mock 數值。"
+    !scenarioModelAvailable
+      ? "正式市場情境至少需要 TAIEX、TWTECH 與 US10Y；缺漏時不進行方向推估。"
       : undefined,
     ...providerErrors,
   ].filter((item): item is string => Boolean(item));
@@ -225,9 +273,13 @@ export async function generateReport(
         100,
     ),
     isTradingDay,
-    marketView: scenarioModelAvailable ? "震盪" : "資料不足",
+    marketView: scenarioModelAvailable
+      ? resolution.mode === "mock"
+        ? "震盪"
+        : marketViewFromOfficialData(globalMarkets)
+      : "資料不足",
     confidence,
-    volatility: scenarioModelAvailable ? "中" : "未知",
+    volatility: "未知",
     keyPoints: narrative.keyPoints,
     conclusion: narrative.conclusion,
     globalMarkets,

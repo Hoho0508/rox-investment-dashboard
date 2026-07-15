@@ -14,6 +14,7 @@ import type { MarketDataProvider } from "@/lib/providers/contracts";
 import { FinMindMarketDataProvider } from "@/lib/providers/finmind";
 import { ManualMarketDataProvider } from "@/lib/providers/manual-market";
 import { MockMarketDataProvider } from "@/lib/providers/mock-market";
+import { OfficialGlobalMarketProvider } from "@/lib/providers/official-global-market";
 import { normalizeProviderError, ProviderError } from "@/lib/providers/errors";
 import { staleEnvelope } from "@/lib/providers/envelopes";
 import { UnavailableMarketDataProvider } from "@/lib/providers/unavailable-market";
@@ -30,6 +31,29 @@ function unavailableFromResolution(resolution: DataModeResolution) {
     resolution.errorCode ?? "NOT_CONFIGURED",
     resolution.warning ?? "正式資料模式尚未完成設定。",
   );
+}
+
+export class LiveReportMarketDataProvider implements MarketDataProvider {
+  readonly mode = "delayed" as const;
+
+  constructor(
+    private readonly globalProvider: Pick<
+      MarketDataProvider,
+      "getGlobalMarkets"
+    > = new OfficialGlobalMarketProvider(),
+    private readonly stockProvider: Pick<
+      MarketDataProvider,
+      "getCoreStocks"
+    > = new FinMindMarketDataProvider(),
+  ) {}
+
+  getGlobalMarkets() {
+    return this.globalProvider.getGlobalMarkets();
+  }
+
+  getCoreStocks() {
+    return this.stockProvider.getCoreStocks();
+  }
 }
 
 export class StaleAwareMarketDataProvider implements MarketDataProvider {
@@ -136,7 +160,7 @@ export function createReportMarketProvider(
     return new UnavailableMarketDataProvider(
       unavailableFromResolution(resolution),
     );
-  return new StaleAwareMarketDataProvider(new FinMindMarketDataProvider());
+  return new StaleAwareMarketDataProvider(new LiveReportMarketDataProvider());
 }
 
 export function createRealtimeTaiwanProvider(

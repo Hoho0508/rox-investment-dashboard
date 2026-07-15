@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   generateReport,
   generateMorningReport,
@@ -13,6 +13,7 @@ describe("晨報生成", () => {
     delete process.env.DATA_MODE;
     delete process.env.FINMIND_API_TOKEN;
     delete process.env.FUGLE_MARKETDATA_API_KEY;
+    vi.unstubAllGlobals();
   });
   it("三情境機率合計為 100%", async () =>
     expect(validateScenarioTotal(await generateMorningReport())).toBe(true));
@@ -68,9 +69,16 @@ describe("晨報生成", () => {
 
   it("正式 Live 模式不把 Mock 補進報告", async () => {
     process.env.DATA_MODE = "live";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("official provider unavailable")),
+    );
     const report = await generateReport("close");
     expect(report.dataMode).toBe("unavailable");
-    expect(report.globalMarkets).toEqual([]);
+    expect(report.globalMarkets).toHaveLength(5);
+    expect(
+      report.globalMarkets.every((market) => market.price.value === null),
+    ).toBe(true);
     expect(report.stocks.every((stock) => stock.price.value === null)).toBe(
       true,
     );
@@ -84,6 +92,67 @@ describe("晨報生成", () => {
     expect(report.conclusion).toContain("目前資料不足");
     expect(report.conclusion).not.toContain("科技股情緒偏弱");
     expect(validateScenarioTotal(report)).toBe(true);
+  });
+
+  it("官方市場資料完整時不再將整份報告標成資料不足", async () => {
+    process.env.DATA_MODE = "live";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.includes("openapi.twse.com.tw"))
+          return new Response(
+            JSON.stringify([
+              {
+                日期: "1150714",
+                指數: "發行量加權股價指數",
+                收盤指數: "44,737.95",
+                漲跌百分比: "-1.42",
+              },
+              {
+                日期: "1150714",
+                指數: "臺灣50指數",
+                收盤指數: "41,455.31",
+                漲跌百分比: "-1.36",
+              },
+              {
+                日期: "1150714",
+                指數: "臺灣資訊科技指數",
+                收盤指數: "87,232.06",
+                漲跌百分比: "-1.50",
+              },
+            ]),
+            { status: 200 },
+          );
+        return new Response(
+          `<feed>
+            <entry><content><m:properties>
+              <d:NEW_DATE>2026-07-13T00:00:00</d:NEW_DATE>
+              <d:BC_2YEAR>4.18</d:BC_2YEAR><d:BC_10YEAR>4.53</d:BC_10YEAR>
+            </m:properties></content></entry>
+            <entry><content><m:properties>
+              <d:NEW_DATE>2026-07-14T00:00:00</d:NEW_DATE>
+              <d:BC_2YEAR>4.21</d:BC_2YEAR><d:BC_10YEAR>4.56</d:BC_10YEAR>
+            </m:properties></content></entry>
+          </feed>`,
+          { status: 200 },
+        );
+      }),
+    );
+
+    const report = await generateMorningReport(
+      new Date("2026-07-15T01:00:00Z"),
+    );
+
+    expect(report.dataMode).toBe("delayed");
+    expect(report.scenarioModelAvailable).toBe(true);
+    expect(report.marketView).toBe("中性偏空");
+    expect(report.confidence).toBeGreaterThan(0);
+    expect(report.conclusion).toContain("臺灣加權指數");
+    expect(report.conclusion).not.toContain("目前資料不足");
+    expect(
+      report.globalMarkets.every((item) => item.price.value !== null),
+    ).toBe(true);
   });
 
   it("Live 模式拒絕儲存任何含 Mock lineage 的報告", async () => {

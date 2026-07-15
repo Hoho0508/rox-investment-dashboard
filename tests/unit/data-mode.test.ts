@@ -7,6 +7,20 @@ import {
 import { dataModeSchema as validationDataModeSchema } from "@/lib/validation/schemas";
 import { DATA_MODES as DOMAIN_DATA_MODES } from "@/types/domain";
 import { createReportMarketProvider } from "@/lib/providers/provider-factory";
+import { deriveAggregateDataMode } from "@/lib/providers/envelopes";
+import type { DataEnvelope } from "@/types/domain";
+
+const point = (
+  value: number | null,
+  dataMode: DataEnvelope<number>["dataMode"],
+): DataEnvelope<number> => ({
+  value,
+  dataMode,
+  sourceName: "test",
+  fetchedAt: "2026-07-15T00:00:00.000Z",
+  isDelayed: dataMode !== "live",
+  confidence: value === null ? 0 : 90,
+});
 
 describe("統一資料模式", () => {
   it("development 未設定 DATA_MODE 時預設 mock", () => {
@@ -37,5 +51,17 @@ describe("統一資料模式", () => {
     expect(validationDataModeSchema).toBe(dataModeSchema);
     for (const mode of DATA_MODES)
       expect(dataModeSchema.parse(mode)).toBe(mode);
+  });
+
+  it("部分欄位 unavailable 時保留成功資料的 aggregate mode", () => {
+    expect(
+      deriveAggregateDataMode([
+        point(44_737.95, "delayed"),
+        point(null, "unavailable"),
+      ]),
+    ).toBe("delayed");
+    expect(deriveAggregateDataMode([point(null, "unavailable")])).toBe(
+      "unavailable",
+    );
   });
 });
