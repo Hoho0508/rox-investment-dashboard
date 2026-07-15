@@ -3,7 +3,10 @@ import { buildMarketPulse } from "@/lib/intelligence/market-pulse";
 import { getTaiwanCandleSeries } from "@/lib/market";
 import { mockCandles } from "@/lib/market/mock";
 import { generateMorningReport } from "@/lib/reports/generate";
-import { analyzeTechnicalSeries } from "@/lib/technical/analyze";
+import {
+  analyzeTechnicalSeries,
+  assertTechnicalAnalysisInput,
+} from "@/lib/technical/analyze";
 import {
   bollingerBands,
   exponentialMovingAverage,
@@ -40,7 +43,7 @@ describe("V2 技術分析中心", () => {
     expect(series.candles.length).toBe(270);
     expect(series.dataMode).toBe("mock");
     expect(series.supportsLive).toBe(false);
-    expect(series.error).toContain("FUGLE_MARKETDATA_API_KEY");
+    expect(series.errorMessage).toContain("DATA_MODE=mock");
   });
 
   it("正式站沒有行情時保持空白，不生成模擬 K", async () => {
@@ -63,6 +66,7 @@ describe("V2 技術分析中心", () => {
       isDelayed: true,
       supportsLive: false,
       asOf: candles.at(-1)!.time,
+      fetchedAt: "2026-07-15T01:00:00.000Z",
     });
     expect(analysis.score).toBeGreaterThanOrEqual(0);
     expect(analysis.score).toBeLessThanOrEqual(100);
@@ -75,6 +79,26 @@ describe("V2 技術分析中心", () => {
     expect(analysis.biggestRisk.length).toBeGreaterThan(0);
     expect(analysis.invalidation).toContain("重新評估");
     expect(analysis.zones).toHaveLength(4);
+  });
+
+  it("Live 模式拒絕 Mock K 線進入正式技術評分", () => {
+    const candles = mockCandles("2330", 60);
+    expect(() =>
+      assertTechnicalAnalysisInput(
+        {
+          symbol: "2330",
+          interval: "1d",
+          candles,
+          sourceName: "mock fixture",
+          dataMode: "mock",
+          isDelayed: true,
+          supportsLive: false,
+          asOf: candles.at(-1)!.time,
+          fetchedAt: "2026-07-15T01:00:00.000Z",
+        },
+        "live",
+      ),
+    ).toThrow("拒絕使用 Mock K 線");
   });
 
   it("市場脈動在 Mock 模式清楚標示示範，不捏造真實新聞", async () => {

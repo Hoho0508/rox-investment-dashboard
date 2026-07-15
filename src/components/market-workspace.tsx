@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CandlestickChart } from "@/components/candlestick-chart";
+import { DATA_MODE_LABELS, DataProvenance } from "@/components/data-provenance";
 import type {
+  CandleSeries,
   LiveQuote,
   MarketAnalysis,
   PriceCandle,
   TaiwanSecurity,
+  TaiwanSecuritySearchResult,
 } from "@/types/market";
 
 type WatchlistSeed = { symbol: string; name: string; exchange: string | null };
@@ -21,11 +24,9 @@ function formatNumber(value: number | null, digits = 2) {
 }
 
 function modeLabel(quote: LiveQuote) {
-  if (quote.dataMode === "mock") return "模擬資料";
-  if (quote.dataMode === "unavailable") return "正式資料 unavailable";
-  if (quote.status === "closed") return "已收盤";
-  if (quote.isDelayed) return "延遲行情";
-  return "即時行情";
+  return `${DATA_MODE_LABELS[quote.dataMode]} · ${
+    quote.status === "closed" ? "已收盤" : quote.isDelayed ? "延遲" : "非延遲"
+  }`;
 }
 
 export function MarketWorkspace({
@@ -41,6 +42,7 @@ export function MarketWorkspace({
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<TaiwanSecurity[]>([]);
   const [candles, setCandles] = useState<PriceCandle[]>([]);
+  const [candleSeries, setCandleSeries] = useState<CandleSeries | null>(null);
   const [analysis, setAnalysis] = useState<MarketAnalysis | null>(null);
   const [countdown, setCountdown] = useState(30);
   const [message, setMessage] = useState("");
@@ -63,9 +65,10 @@ export function MarketWorkspace({
       };
       setQuotes(payload.quotes);
       const unavailable = payload.quotes.find(
-        (quote) => quote.dataMode === "unavailable",
+        (quote) =>
+          quote.dataMode === "unavailable" || quote.dataMode === "stale",
       );
-      setMessage(unavailable?.error ?? "");
+      setMessage(unavailable?.errorMessage ?? "");
       setCountdown(payload.refreshAfterSeconds);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "行情更新失敗");
@@ -103,9 +106,12 @@ export function MarketWorkspace({
       .then(([candlePayload, analysisPayload]) => {
         if (cancelled) return;
         setCandles(candlePayload.candles ?? []);
-        setAnalysis(analysisPayload.error ? null : analysisPayload);
-        if (candlePayload.error || analysisPayload.error)
-          setMessage(candlePayload.error ?? analysisPayload.error);
+        setCandleSeries(candlePayload);
+        setAnalysis(analysisPayload.errorMessage ? null : analysisPayload);
+        if (candlePayload.errorMessage || analysisPayload.errorMessage)
+          setMessage(
+            candlePayload.errorMessage ?? analysisPayload.errorMessage,
+          );
       })
       .catch(() => !cancelled && setMessage("K 線或歷史分析載入失敗。"));
     return () => {
@@ -118,8 +124,9 @@ export function MarketWorkspace({
     const response = await fetch(
       `/api/market/search?q=${encodeURIComponent(search.trim())}`,
     );
-    const payload = (await response.json()) as TaiwanSecurity[];
-    setResults(Array.isArray(payload) ? payload : []);
+    const payload = (await response.json()) as TaiwanSecuritySearchResult;
+    setResults(payload.value ?? []);
+    setMessage(payload.errorMessage ?? "");
   }
 
   async function addSecurity(security: TaiwanSecurity) {
@@ -143,6 +150,7 @@ export function MarketWorkspace({
     );
     setSelectedSymbol(security.symbol);
     setCandles([]);
+    setCandleSeries(null);
     setAnalysis(null);
     setResults([]);
     setSearch("");
@@ -159,6 +167,7 @@ export function MarketWorkspace({
       if (next) {
         setSelectedSymbol(next.symbol);
         setCandles([]);
+        setCandleSeries(null);
         setAnalysis(null);
       }
     }
@@ -234,6 +243,7 @@ export function MarketWorkspace({
                 onClick={() => {
                   setSelectedSymbol(item.symbol);
                   setCandles([]);
+                  setCandleSeries(null);
                   setAnalysis(null);
                 }}
                 type="button"
@@ -281,10 +291,16 @@ export function MarketWorkspace({
             {selectedQuote && (
               <div className="quote-meta">
                 <strong>{formatNumber(selectedQuote.price)}</strong>
-                <span>
-                  {selectedQuote.sourceName} ·{" "}
-                  {new Date(selectedQuote.asOf).toLocaleString("zh-TW")}
-                </span>
+                <DataProvenance
+                  dataMode={selectedQuote.dataMode}
+                  errorCode={selectedQuote.errorCode}
+                  errorMessage={selectedQuote.errorMessage}
+                  fetchedAt={selectedQuote.fetchedAt}
+                  isDelayed={selectedQuote.isDelayed}
+                  lastSuccessfulFetchAt={selectedQuote.lastSuccessfulFetchAt}
+                  marketDate={selectedQuote.asOf}
+                  sourceName={selectedQuote.sourceName}
+                />
               </div>
             )}
           </div>
@@ -292,6 +308,18 @@ export function MarketWorkspace({
             <div className="chart-empty">分析資料載入中…</div>
           ) : (
             <CandlestickChart candles={candles} />
+          )}
+          {candleSeries && (
+            <DataProvenance
+              dataMode={candleSeries.dataMode}
+              errorCode={candleSeries.errorCode}
+              errorMessage={candleSeries.errorMessage}
+              fetchedAt={candleSeries.fetchedAt}
+              isDelayed={candleSeries.isDelayed}
+              lastSuccessfulFetchAt={candleSeries.lastSuccessfulFetchAt}
+              marketDate={candleSeries.asOf}
+              sourceName={candleSeries.sourceName}
+            />
           )}
         </article>
 

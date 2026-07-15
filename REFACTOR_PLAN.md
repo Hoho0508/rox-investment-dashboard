@@ -1,6 +1,6 @@
 # Core Data and Technical Refactor Plan
 
-本計畫依附件要求分階段執行。本次只完成 Phase 1 稽核；Phase 2 之後尚未開始。
+本計畫依附件要求分階段執行。Phase 1 稽核與 Phase 2 Live／Mock 資料分離已完成；下一階段為 Phase 3 Provider 效能與持久 stale cache。
 
 ## 原則
 
@@ -10,35 +10,35 @@
 - Live 不回 Mock；Mock 不碰 Live；Manual 不被固定數值補齊。
 - 所有分析先驗證 lineage，再計算分數。
 
-## Phase 2：修復模式與 fallback（下一階段）
+## Phase 2：修復模式與 fallback（已完成，2026-07-15）
 
 ### 2.1 集中 runtime mode
 
-- 新增 `src/lib/config/data-mode.ts`。
-- Zod 驗證 `DATA_MODE` 與 production fail-closed 規則。
-- 提供 `getRuntimeDataMode()`、`isProductionRuntime()`，移除散落的直接判斷。
-- 建立六態 DataMode、DataEnvelope 與舊 DataPoint compatibility adapter。
+- [x] 新增 `src/lib/config/data-mode.ts`。
+- [x] Zod 驗證 `DATA_MODE` 與 production fail-closed 規則。
+- [x] 提供集中 resolver 與 `isProductionRuntime()`，移除應用程式內散落的直接判斷。
+- [x] 建立六態 DataMode、DataEnvelope 與舊 DataPoint compatibility alias。
 
 ### 2.2 移除隱性 fallback
 
-- Provider factory 依模式選 provider，不由 provider 捕捉後改走 Mock。
-- live failure 僅回 stale（有快取）或 unavailable。
-- mock 模式即使存在 key 也不呼叫 Live API。
-- 拆除 Live stock 上的 Mock fundamental/risk/event template。
+- [x] Provider factory 依模式選 provider，不由 provider 捕捉後改走 Mock。
+- [x] live failure 僅回 stale（有 process-memory 成功快取）或 unavailable。
+- [x] mock 模式即使存在 key 也不呼叫 Live API。
+- [x] 拆除 Live stock 上的 Mock fundamental/risk/event template。
 
 ### 2.3 分析/評分閘門
 
-- Live 模式拒絕 Mock K 線進技術/歷史評分。
-- ScoreResult 增加 validity、dataMode、missingInputs。
-- 報告 UI 對 invalid 顯示資料不足，不顯示數字分數。
+- [x] Live 模式拒絕 Mock K 線進技術分析。
+- [x] Live 報告關鍵資料 unavailable 時降低 confidence；Mock lineage 不得以正式報告儲存。
+- [ ] ScoreResult 增加 validity、dataMode、missingInputs；此評分契約調整留在 Phase 4，避免本階段改變評分邏輯。
 
 ### 2.4 測試
 
-- production missing/invalid mode、mock with key、FinMind/Fugle failure、mixed snapshot、Mock analysis rejection、scenario 100%。
+- [x] production missing/invalid mode、mock with key、FinMind/Fugle failure、stale/unavailable、mixed snapshot、Mock analysis rejection與模式 schema 一致性。
 
-**Phase 2 驗收：** 全 repo 模式判斷集中；live 路徑 0 個 Mock fallback；舊頁面可運作；`pnpm check`、E2E、build 通過。
+**Phase 2 驗收：** 全 repo 模式判斷集中；live 路徑 0 個 Mock fallback；舊頁面可運作；實際命令結果記錄於 `TEST_REPORT.md`。
 
-## Phase 3：Provider、錯誤與快取
+## Phase 3：Provider 效能、持久快取與限流（下一階段）
 
 建議先建立新目錄並用 adapter 漸進遷移：
 
@@ -59,8 +59,8 @@ src/lib/providers/
   unavailable/index.ts
 ```
 
-- 共用 HTTP client：timeout、invalid JSON、status、429、empty、semantic date/OHLC validation、error sanitization。
-- Cache policy：quote short、daily candle medium、fundamental long；request coalescing 與 stale-if-error。
+- 已完成基礎結構化錯誤、timeout、status、429、invalid response、empty 與 OHLC 驗證；下一步抽成共用 HTTP client。
+- 將 Phase 2 的 process-memory stale-if-error 升級為跨 serverless instance 的持久 cache；補齊 TTL policy 與 request coalescing。
 - 前端 polling：visibility、market hours、AbortController、exponential backoff、Retry-After。
 - 登入、報價與手動產報 rate limit。
 

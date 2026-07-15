@@ -1,4 +1,5 @@
 import { latestOrPreview } from "@/lib/reports/view";
+import { DataProvenance } from "@/components/data-provenance";
 export const dynamic = "force-dynamic";
 export default async function DataStatusPage() {
   const report = await latestOrPreview();
@@ -31,17 +32,16 @@ export default async function DataStatusPage() {
                 report.globalMarkets.map((item) => (
                   <tr key={item.symbol}>
                     <td>{item.name}</td>
-                    <td>{item.price.sourceName}</td>
+                    <td>
+                      <DataProvenance {...item.price} />
+                    </td>
                     <td>{item.price.marketDate}</td>
                     <td>
                       {new Date(item.price.fetchedAt).toLocaleString("zh-TW", {
                         timeZone: "Asia/Taipei",
                       })}
                     </td>
-                    <td>
-                      {item.price.dataMode === "live" ? "正式" : "缺少資料"}／
-                      {item.price.isDelayed ? "延遲" : "即時"}
-                    </td>
+                    <td>{item.price.dataMode.toUpperCase()}</td>
                   </tr>
                 ))
               ) : (
@@ -51,6 +51,33 @@ export default async function DataStatusPage() {
                   </td>
                 </tr>
               )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="card section">
+        <h2>核心股票價格</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>股票</th>
+                <th>資料狀態</th>
+                <th>數值</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.stocks.map((stock) => (
+                <tr key={stock.symbol}>
+                  <td>
+                    {stock.symbol} {stock.name}
+                  </td>
+                  <td>
+                    <DataProvenance {...stock.price} />
+                  </td>
+                  <td>{stock.price.value ?? "—"}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

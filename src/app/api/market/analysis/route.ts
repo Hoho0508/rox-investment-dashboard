@@ -18,7 +18,10 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "歷史分析失敗。" },
+      {
+        errorCode: "ANALYSIS_UNAVAILABLE",
+        errorMessage: error instanceof Error ? error.message : "歷史分析失敗。",
+      },
       { status: 422 },
     );
   }

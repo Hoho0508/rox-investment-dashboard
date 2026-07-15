@@ -22,7 +22,11 @@ export async function GET(request: Request) {
       quotes,
       refreshAfterSeconds: quotes.some((item) => item.dataMode === "live")
         ? 15
-        : 30,
+        : quotes.some((item) => item.dataMode === "delayed")
+          ? 300
+          : quotes.some((item) => item.dataMode === "stale")
+            ? 120
+            : 60,
     },
     { headers: { "Cache-Control": "private, no-store" } },
   );

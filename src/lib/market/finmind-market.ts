@@ -1,12 +1,17 @@
 import { subDays, subYears } from "date-fns";
 import { z } from "zod";
 import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
-import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
+import { unavailableQuote } from "@/lib/market/unavailable";
+import {
+  normalizeProviderError,
+  ProviderError,
+  providerHttpError,
+} from "@/lib/providers/errors";
 import { taipeiDate } from "@/lib/reports/calendar";
 import type { LiveQuote, PriceCandle, TaiwanSecurity } from "@/types/market";
-import { unavailableQuote } from "@/lib/market/unavailable";
 
 const DATA_URL = "https://api.finmindtrade.com/api/v4/data";
+
 const infoSchema = z.object({
   status: z.number(),
   data: z.array(
@@ -17,25 +22,60 @@ const infoSchema = z.object({
     }),
   ),
 });
+
+const priceRowSchema = z.object({
+  date: z.string().date(),
+  open: z.coerce.number().positive().finite(),
+  max: z.coerce.number().positive().finite(),
+  min: z.coerce.number().positive().finite(),
+  close: z.coerce.number().positive().finite(),
+  Trading_Volume: z.coerce.number().nonnegative().finite(),
+});
+
 const priceSchema = z.object({
   status: z.number(),
-  data: z.array(
-    z.object({
-      date: z.string(),
-      open: z.coerce.number(),
-      max: z.coerce.number(),
-      min: z.coerce.number(),
-      close: z.coerce.number(),
-      Trading_Volume: z.coerce.number(),
-    }),
-  ),
+  data: z.array(priceRowSchema),
 });
 
 let securityCache: { expiresAt: number; rows: TaiwanSecurity[] } | undefined;
 
-function authHeaders() {
+function finMindHeaders() {
   const token = process.env.FINMIND_API_TOKEN;
-  return token ? { Authorization: `Bearer ${token}` } : undefined;
+  if (!token)
+    throw new ProviderError(
+      "NOT_CONFIGURED",
+      "未設定 FINMIND_API_TOKEN，FinMind 資料 unavailable。",
+    );
+  return { Authorization: `Bearer ${token}`, Accept: "application/json" };
+}
+
+async function parseJson(response: Response, provider: string) {
+  if (!response.ok) throw providerHttpError(provider, response.status);
+  try {
+    return await response.json();
+  } catch {
+    throw new ProviderError(
+      "INVALID_RESPONSE",
+      `${provider} 回傳無法解析的資料。`,
+    );
+  }
+}
+
+function validatePriceRows(
+  rows: z.infer<typeof priceRowSchema>[],
+  symbol: string,
+) {
+  for (const row of rows) {
+    if (
+      row.max < Math.max(row.open, row.close) ||
+      row.min > Math.min(row.open, row.close) ||
+      row.max < row.min
+    )
+      throw new ProviderError(
+        "INVALID_RESPONSE",
+        `FinMind ${symbol} OHLC 資料不一致。`,
+      );
+  }
 }
 
 export async function searchFinMindSecurities(query: string, limit = 20) {
@@ -43,15 +83,21 @@ export async function searchFinMindSecurities(query: string, limit = 20) {
     const url = new URL(DATA_URL);
     url.searchParams.set("dataset", "TaiwanStockInfo");
     const response = await fetch(url, {
-      headers: authHeaders(),
+      headers: finMindHeaders(),
       signal: AbortSignal.timeout(8_000),
       next: { revalidate: 21_600 },
     });
-    if (!response.ok) throw new Error(`FinMind 清單 HTTP ${response.status}`);
-    const parsed = infoSchema.parse(await response.json());
+    const parsed = infoSchema.safeParse(await parseJson(response, "FinMind"));
+    if (!parsed.success || parsed.data.status !== 200)
+      throw new ProviderError(
+        "INVALID_RESPONSE",
+        "FinMind 股票清單格式或狀態不正確。",
+      );
+    if (parsed.data.data.length === 0)
+      throw new ProviderError("EMPTY_DATA", "FinMind 股票清單為空。 ");
     securityCache = {
       expiresAt: Date.now() + 21_600_000,
-      rows: parsed.data
+      rows: parsed.data.data
         .filter((item) => ["twse", "tpex"].includes(item.type.toLowerCase()))
         .map((item) => ({
           symbol: item.stock_id,
@@ -82,13 +128,20 @@ export async function fetchFinMindCandles(
   url.searchParams.set("start_date", taipeiDate(subYears(new Date(), 2)));
   url.searchParams.set("end_date", taipeiDate());
   const response = await fetch(url, {
-    headers: authHeaders(),
+    headers: finMindHeaders(),
     signal: AbortSignal.timeout(8_000),
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(`FinMind 歷史資料 HTTP ${response.status}`);
-  const parsed = priceSchema.parse(await response.json());
-  return parsed.data
+  const parsed = priceSchema.safeParse(await parseJson(response, "FinMind"));
+  if (!parsed.success || parsed.data.status !== 200)
+    throw new ProviderError(
+      "INVALID_RESPONSE",
+      "FinMind 歷史資料格式或狀態不正確。",
+    );
+  if (parsed.data.data.length === 0)
+    throw new ProviderError("EMPTY_DATA", "FinMind 歷史資料為空。 ");
+  validatePriceRows(parsed.data.data, symbol);
+  return parsed.data.data
     .map((item) => ({
       time: item.date,
       open: item.open,
@@ -101,11 +154,6 @@ export async function fetchFinMindCandles(
     .slice(-limit);
 }
 
-const delayedQuoteCache = new Map<
-  string,
-  { expiresAt: number; quote: LiveQuote }
->();
-
 async function fetchRecentCandles(symbol: string) {
   const url = new URL(DATA_URL);
   url.searchParams.set("dataset", "TaiwanStockPrice");
@@ -113,35 +161,33 @@ async function fetchRecentCandles(symbol: string) {
   url.searchParams.set("start_date", taipeiDate(subDays(new Date(), 30)));
   url.searchParams.set("end_date", taipeiDate());
   const response = await fetch(url, {
-    headers: authHeaders(),
+    headers: finMindHeaders(),
     signal: AbortSignal.timeout(6_000),
     cache: "no-store",
   });
-  if (!response.ok)
-    throw new Error(`FinMind 最新收盤價 HTTP ${response.status}`);
-  const parsed = priceSchema.parse(await response.json());
-  return parsed.data.sort((a, b) => a.date.localeCompare(b.date)).slice(-2);
+  const parsed = priceSchema.safeParse(await parseJson(response, "FinMind"));
+  if (!parsed.success || parsed.data.status !== 200)
+    throw new ProviderError(
+      "INVALID_RESPONSE",
+      "FinMind 最新收盤價格式或狀態不正確。",
+    );
+  if (parsed.data.data.length === 0)
+    throw new ProviderError("EMPTY_DATA", "FinMind 查無最近交易資料。 ");
+  validatePriceRows(parsed.data.data, symbol);
+  return parsed.data.data
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-2);
 }
 
+/** Strict FinMind delayed quote provider. It never uses Mock data. */
 export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvider {
-  private readonly fallback = new MockRealtimeTaiwanProvider();
-
   async search(query: string, limit = 20) {
-    try {
-      return await searchFinMindSecurities(query, limit);
-    } catch {
-      return process.env.DATA_MODE === "live"
-        ? []
-        : this.fallback.search(query, limit);
-    }
+    return searchFinMindSecurities(query, limit);
   }
 
   async getQuotes(symbols: string[]): Promise<LiveQuote[]> {
-    const fallback = await this.fallback.getQuotes(symbols);
     return Promise.all(
-      symbols.map(async (symbol, index) => {
-        const cached = delayedQuoteCache.get(symbol);
-        if (cached && cached.expiresAt > Date.now()) return cached.quote;
+      symbols.map(async (symbol) => {
         try {
           const [securityRows, prices] = await Promise.all([
             searchFinMindSecurities(symbol, 10),
@@ -149,14 +195,16 @@ export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvide
           ]);
           const latest = prices.at(-1);
           const previous = prices.at(-2);
-          if (!latest) throw new Error("查無最近交易資料");
+          if (!latest)
+            throw new ProviderError("EMPTY_DATA", "FinMind 查無最近交易資料。");
           const security = securityRows.find((item) => item.symbol === symbol);
           const previousClose = previous?.close ?? latest.close;
           const change = latest.close - previousClose;
-          const quote: LiveQuote = {
+          const fetchedAt = new Date().toISOString();
+          return {
             symbol,
-            name: security?.name ?? fallback[index].name,
-            exchange: security?.exchange ?? fallback[index].exchange,
+            name: security?.name ?? symbol,
+            exchange: security?.exchange ?? "UNKNOWN",
             market: "TW",
             price: latest.close,
             previousClose,
@@ -165,43 +213,31 @@ export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvide
             low: latest.min,
             change,
             changePercent:
-              previousClose === 0 ? 0 : (change / previousClose) * 100,
+              previousClose <= 0 ? null : (change / previousClose) * 100,
             volume: latest.Trading_Volume,
             asOf: `${latest.date}T13:30:00+08:00`,
+            fetchedAt,
             sourceName: "FinMind / TaiwanStockPrice",
             sourceUrl: DATA_URL,
-            dataMode: "live",
+            dataMode: "delayed",
             isDelayed: true,
             status: "delayed",
-          };
-          delayedQuoteCache.set(symbol, {
-            expiresAt: Date.now() + 300_000,
-            quote,
-          });
-          return quote;
+            lastSuccessfulFetchAt: fetchedAt,
+          } satisfies LiveQuote;
         } catch (error) {
-          if (process.env.DATA_MODE === "live")
-            return unavailableQuote(
-              symbol,
-              "FinMind 暫時無法取得",
-              `FinMind 最新收盤價取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
-            );
-          return {
-            ...fallback[index],
-            error: `FinMind 最新收盤價取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
-          };
+          const normalized = normalizeProviderError(error, "FinMind");
+          return unavailableQuote(
+            symbol,
+            "FinMind / TaiwanStockPrice",
+            normalized.message,
+            normalized.code,
+          );
         }
       }),
     );
   }
+}
 
-  async getCandles(symbol: string, limit = 320) {
-    try {
-      return await fetchFinMindCandles(symbol, limit);
-    } catch {
-      return process.env.DATA_MODE === "live"
-        ? []
-        : this.fallback.getCandles(symbol, limit);
-    }
-  }
+export function resetFinMindMarketCacheForTests() {
+  securityCache = undefined;
 }

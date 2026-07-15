@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CandlestickChart } from "@/components/candlestick-chart";
+import { DATA_MODE_LABELS, DataProvenance } from "@/components/data-provenance";
 import type { CandleInterval, CandleSeries } from "@/types/market";
 import type { TechnicalAnalysis } from "@/types/technical";
 
@@ -42,7 +43,7 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
           if (cancelled) return;
           setSeries(payload.series ?? null);
           setAnalysis(payload.analysis ?? null);
-          setError(payload.error ?? "");
+          setError(payload.errorMessage ?? "");
         })
         .catch(() => !cancelled && setError("技術分析載入失敗。"));
     }, 0);
@@ -75,12 +76,17 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
       </div>
       {series?.dataMode === "mock" && (
         <p className="notice">
-          {series.error ?? "目前為模擬分鐘 K，不代表真實盤中行情。"}
+          {series.errorMessage ?? "目前為模擬 K，不代表真實市場行情。"}
+        </p>
+      )}
+      {series?.dataMode === "stale" && (
+        <p className="notice">
+          {series.errorMessage ?? "資料更新失敗，目前顯示上一筆成功 K 線。"}
         </p>
       )}
       {series?.dataMode === "unavailable" && (
         <p className="notice">
-          {series.error ?? "正式資料暫時無法取得，未顯示模擬 K 線。"}
+          {series.errorMessage ?? "正式資料暫時無法取得，未顯示模擬 K 線。"}
         </p>
       )}
       {error && <p className="notice">{error}</p>}
@@ -99,14 +105,7 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
             {series && (
               <div className="quote-meta">
                 <strong>{number(series.candles.at(-1)?.close ?? null)}</strong>
-                <span>
-                  {series.sourceName} ·{" "}
-                  {series.dataMode === "unavailable"
-                    ? "資料 unavailable"
-                    : series.isDelayed
-                      ? "延遲"
-                      : "即時"}
-                </span>
+                <span>{DATA_MODE_LABELS[series.dataMode]}</span>
               </div>
             )}
           </div>
@@ -114,6 +113,18 @@ export function TechnicalAnalysisWorkspace({ symbol }: { symbol: string }) {
             <CandlestickChart candles={series.candles} />
           ) : (
             <div className="chart-empty">K 線載入中或資料不足…</div>
+          )}
+          {series && (
+            <DataProvenance
+              dataMode={series.dataMode}
+              errorCode={series.errorCode}
+              errorMessage={series.errorMessage}
+              fetchedAt={series.fetchedAt}
+              isDelayed={series.isDelayed}
+              lastSuccessfulFetchAt={series.lastSuccessfulFetchAt}
+              marketDate={series.asOf}
+              sourceName={series.sourceName}
+            />
           )}
         </article>
 

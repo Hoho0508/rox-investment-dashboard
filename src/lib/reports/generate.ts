@@ -1,5 +1,7 @@
 import { DEFAULT_SCENARIOS } from "@/lib/config/market-scenarios";
-import { getMarketProvider, resolveDataMode } from "@/lib/providers";
+import { resolveRuntimeDataMode } from "@/lib/config/data-mode";
+import { getMarketProvider } from "@/lib/providers";
+import { deriveAggregateDataMode } from "@/lib/providers/envelopes";
 import { isTaiwanTradingDay, taipeiDate } from "@/lib/reports/calendar";
 import { calculateEntryScore } from "@/lib/scoring/entry";
 import { calculateExitWarning } from "@/lib/scoring/exit";
@@ -161,7 +163,7 @@ export async function generateReport(
   now = new Date(),
 ): Promise<DailyReport> {
   const provider = getMarketProvider();
-  const resolution = resolveDataMode();
+  const resolution = resolveRuntimeDataMode();
   const [globalMarkets, coreStocks] = await Promise.all([
     provider.getGlobalMarkets(),
     provider.getCoreStocks(),
@@ -175,15 +177,17 @@ export async function generateReport(
     isTradingDay,
     scenarioModelAvailable,
   );
-  const fallbackErrors = coreStocks.flatMap((stock) =>
-    stock.price.error ? [`${stock.symbol}：${stock.price.error}`] : [],
+  const providerErrors = coreStocks.flatMap((stock) =>
+    stock.price.errorMessage
+      ? [`${stock.symbol}：${stock.price.errorMessage}`]
+      : [],
   );
   const missingData = [
     resolution.warning,
     globalMarkets.length === 0
       ? "全球市場正式資料 Provider 尚未串接；未使用 Mock 數值。"
       : undefined,
-    ...fallbackErrors,
+    ...providerErrors,
   ].filter((item): item is string => Boolean(item));
   const allPoints = [
     ...globalMarkets.map((item) => item.price),
@@ -195,15 +199,18 @@ export async function generateReport(
       .filter(Boolean)
       .sort()
       .at(-1) ?? now.toISOString();
-  const reportDataMode =
-    allPoints.some((item) => item.dataMode === "unavailable") ||
-    allPoints.length === 0
-      ? "unavailable"
-      : allPoints.every((item) => item.dataMode === "live")
-        ? "live"
-        : allPoints.some((item) => item.dataMode === "manual")
-          ? "manual"
-          : "mock";
+  const reportDataMode = deriveAggregateDataMode(allPoints);
+  const confidence = !scenarioModelAvailable
+    ? 0
+    : reportDataMode === "live"
+      ? 68
+      : reportDataMode === "delayed"
+        ? 58
+        : reportDataMode === "stale"
+          ? 45
+          : reportDataMode === "manual"
+            ? 45
+            : 35;
   return {
     reportType,
     reportDate: taipeiDate(now),
@@ -219,7 +226,7 @@ export async function generateReport(
     ),
     isTradingDay,
     marketView: scenarioModelAvailable ? "震盪" : "資料不足",
-    confidence: scenarioModelAvailable ? 68 : 0,
+    confidence,
     volatility: scenarioModelAvailable ? "中" : "未知",
     keyPoints: narrative.keyPoints,
     conclusion: narrative.conclusion,

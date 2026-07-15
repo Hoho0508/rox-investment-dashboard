@@ -1,4 +1,4 @@
-import type { DataMode } from "@/types/domain";
+import type { DataEnvelope, DataMode } from "@/types/domain";
 
 export type TaiwanSecurity = {
   symbol: string;
@@ -6,6 +6,8 @@ export type TaiwanSecurity = {
   exchange: "TWSE" | "TPEx" | "ESB" | "UNKNOWN";
   market: "TW";
 };
+
+export type TaiwanSecuritySearchResult = DataEnvelope<TaiwanSecurity[]>;
 
 export type LiveQuote = TaiwanSecurity & {
   price: number | null;
@@ -17,12 +19,16 @@ export type LiveQuote = TaiwanSecurity & {
   changePercent: number | null;
   volume: number | null;
   asOf: string;
+  fetchedAt: string;
   sourceName: string;
   sourceUrl?: string;
   dataMode: DataMode;
   isDelayed: boolean;
-  status: "open" | "closed" | "delayed" | "mock" | "unavailable";
-  error?: string;
+  status:
+    "open" | "closed" | "delayed" | "stale" | "manual" | "mock" | "unavailable";
+  lastSuccessfulFetchAt?: string;
+  errorCode?: string;
+  errorMessage?: string;
 };
 
 export type PriceCandle = {
@@ -57,7 +63,10 @@ export type CandleSeries = {
   isDelayed: boolean;
   supportsLive: boolean;
   asOf: string;
-  error?: string;
+  fetchedAt: string;
+  lastSuccessfulFetchAt?: string;
+  errorCode?: string;
+  errorMessage?: string;
 };
 
 export type SimilarMarketPeriod = {

@@ -4,6 +4,19 @@
 
 ## Unreleased
 
+### Phase 2 — Live／Mock Separation
+
+- 新增六態 `DataMode`、統一 `DataEnvelope<T>`、runtime mode resolver、結構化 Provider 錯誤與集中 Provider Factory。
+- Production 缺少或誤設 `DATA_MODE` 時改為 fail closed；development 未設定時才預設 Mock。
+- 移除 FinMind、Fugle、行情、K 線與晨報路徑中的 Live→Mock 隱性 fallback；Live 失敗僅能回 stale 或 unavailable。
+- FinMind 與 Fugle 各自只讀自己的 server-side Key，不互相代用，不把秘密放入錯誤或 response。
+- 核心股票 Live snapshot 不再從 Mock template 補 EPS、估值、風險、事件或敘事。
+- 新增成功資料的 best-effort process-memory stale cache，並保留 `lastSuccessfulFetchAt`。
+- Live runtime 拒絕儲存含 Mock lineage 的正式報告，也拒絕以 Mock K 線產生技術分析。
+- 新增共用資料來源 UI，顯示 LIVE／DELAYED／STALE／MANUAL／MOCK／UNAVAILABLE、來源、日期、抓取與錯誤狀態。
+- 非 Mock 的市場脈動不再用固定族群、資金流或交易主題補值。
+- 更新單元與 E2E 測試，覆蓋 production fail-closed、Mock isolation、stale/unavailable、Token sanitization 與報告儲存限制。
+
 ### Audited
 
 - 完成核心資料層、Provider、Live/Mock、技術分析、評分、快取、資料庫、Cron、測試與部署設定的 Phase 1 稽核。
@@ -23,7 +36,7 @@
 - 新增 Live 資料不足與本機 Mock 降級的單元測試。
 - 新增 `SETUP_REQUIRED.md`，集中記錄必須由擁有者親自完成的外部授權與環境設定。
 
-### Changed
+### Changed（Phase 1）
 
-- 晨報缺少 FinMind 或 FinMind 暫時失敗時，優先使用已設定的 Fugle 真實台股報價；Fugle 行情不會混入 Mock 基本面。
+- 晨報台股資料路徑曾使用 FinMind／Fugle；Phase 2 已由嚴格 Factory 取代此跨 Provider fallback，詳見上方最新紀錄。
 - 登入後手動產生報告會更新同日同類紀錄；Cron 仍維持同日去重。

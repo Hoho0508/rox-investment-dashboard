@@ -1,7 +1,16 @@
-import type { LiveQuote, PriceCandle, TaiwanSecurity } from "@/types/market";
+import type { CandleSeries, LiveQuote, TaiwanSecurity } from "@/types/market";
 
-export interface RealtimeTaiwanMarketProvider {
+export interface TaiwanSecuritySearchProvider {
   search(query: string, limit?: number): Promise<TaiwanSecurity[]>;
-  getQuotes(symbols: string[]): Promise<LiveQuote[]>;
-  getCandles(symbol: string, limit?: number): Promise<PriceCandle[]>;
 }
+
+export interface RealtimeQuoteProvider {
+  getQuotes(symbols: string[]): Promise<LiveQuote[]>;
+}
+
+export interface CandleProvider {
+  getCandleSeries(symbol: string): Promise<CandleSeries>;
+}
+
+export interface RealtimeTaiwanMarketProvider
+  extends TaiwanSecuritySearchProvider, RealtimeQuoteProvider {}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { DailyReport } from "@/types/domain";
 import { GenerateReportButton } from "@/components/generate-report-button";
 import { REPORT_DEFINITIONS, REPORT_TYPES } from "@/lib/reports/config";
+import { DATA_MODE_LABELS, DataProvenance } from "@/components/data-provenance";
 
 const n = (value: number | null) =>
   value === null
@@ -41,15 +42,7 @@ export function ReportView({ report }: { report: DailyReport }) {
             })}
           </p>
         </div>
-        <span className="pill">
-          {report.dataMode === "mock"
-            ? "模擬資料"
-            : report.dataMode === "manual"
-              ? "手動資料"
-              : report.dataMode === "live"
-                ? "Live 資料"
-                : "真實資料尚未完整"}
-        </span>
+        <span className="pill">{DATA_MODE_LABELS[report.dataMode]}</span>
       </div>
       <GenerateReportButton reportType={report.reportType} />
       {report.dataMode === "mock" && (
@@ -63,6 +56,14 @@ export function ReportView({ report }: { report: DailyReport }) {
           補值；缺少合法資料來源的欄位會保持空白。可用的台股資料仍標示 Fugle 或
           FinMind 來源。
         </div>
+      )}
+      {report.dataMode === "stale" && (
+        <div className="notice">
+          目前顯示上一筆成功資料（STALE）；請查看每項上次成功時間與錯誤狀態。
+        </div>
+      )}
+      {report.dataMode === "delayed" && (
+        <div className="notice">目前資料為 DELAYED，不是盤中即時行情。</div>
       )}
       <section className="grid grid-4 section">
         <div className="card">
@@ -145,8 +146,7 @@ export function ReportView({ report }: { report: DailyReport }) {
                     <td>
                       {item.name}
                       <div className="source">
-                        {item.price.sourceName} ·{" "}
-                        {item.price.isDelayed ? "延遲" : "即時"}
+                        <DataProvenance {...item.price} />
                       </div>
                     </td>
                     <td>
@@ -189,7 +189,10 @@ export function ReportView({ report }: { report: DailyReport }) {
                     <strong>{stock.name}</strong>
                     <div className="source">{stock.symbol}</div>
                   </td>
-                  <td>{n(stock.price.value)}</td>
+                  <td>
+                    {n(stock.price.value)}
+                    <DataProvenance {...stock.price} />
+                  </td>
                   <td>
                     {stock.entry.score} · {stock.entry.label}
                   </td>

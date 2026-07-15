@@ -6,6 +6,12 @@ export interface MarketDataProvider {
   getCoreStocks(): Promise<StockSnapshot[]>;
 }
 
+export type TaiwanMarketDataProvider = MarketDataProvider;
+export type {
+  CandleProvider,
+  RealtimeQuoteProvider,
+} from "@/lib/market/contracts";
+
 export interface FundamentalDataProvider {
   mode: DataMode;
 }

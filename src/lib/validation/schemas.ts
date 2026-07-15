@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { DATA_MODES } from "@/types/domain";
 
-export const dataModeSchema = z.enum(["mock", "manual", "live"]);
+export const dataModeSchema = z.enum(DATA_MODES);
 
 export const journalEntrySchema = z.object({
   symbol: z

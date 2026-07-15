@@ -1,43 +1,75 @@
 import { z } from "zod";
 import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
-import {
-  fetchFinMindCandles,
-  searchFinMindSecurities,
-} from "@/lib/market/finmind-market";
-import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
-import type { LiveQuote } from "@/types/market";
-import type { CandleInterval, PriceCandle } from "@/types/market";
 import { unavailableQuote } from "@/lib/market/unavailable";
+import {
+  normalizeProviderError,
+  ProviderError,
+  providerHttpError,
+} from "@/lib/providers/errors";
+import type { CandleInterval, LiveQuote, PriceCandle } from "@/types/market";
+import type { TaiwanSecurity } from "@/types/market";
 
 const BASE_URL = "https://api.fugle.tw/marketdata/v1.0/stock";
+
 const quoteSchema = z.object({
   symbol: z.string(),
   name: z.string(),
   exchange: z.string(),
-  lastPrice: z.number().nullish(),
-  closePrice: z.number().nullish(),
-  previousClose: z.number().nullish(),
-  openPrice: z.number().nullish(),
-  highPrice: z.number().nullish(),
-  lowPrice: z.number().nullish(),
+  lastPrice: z.number().positive().nullish(),
+  closePrice: z.number().positive().nullish(),
+  previousClose: z.number().positive().nullish(),
+  openPrice: z.number().positive().nullish(),
+  highPrice: z.number().positive().nullish(),
+  lowPrice: z.number().positive().nullish(),
   change: z.number().nullish(),
   changePercent: z.number().nullish(),
-  lastUpdated: z.number().nullish(),
+  lastUpdated: z.number().positive().nullish(),
   isClose: z.boolean().optional(),
-  total: z.object({ tradeVolume: z.number().nullish() }).optional(),
+  total: z
+    .object({ tradeVolume: z.number().nonnegative().nullish() })
+    .optional(),
 });
-const candleSchema = z.object({
-  data: z.array(
-    z.object({
-      date: z.string(),
-      open: z.coerce.number(),
-      high: z.coerce.number(),
-      low: z.coerce.number(),
-      close: z.coerce.number(),
-      volume: z.coerce.number(),
-    }),
-  ),
+
+const candleRowSchema = z.object({
+  date: z.string(),
+  open: z.coerce.number().positive().finite(),
+  high: z.coerce.number().positive().finite(),
+  low: z.coerce.number().positive().finite(),
+  close: z.coerce.number().positive().finite(),
+  volume: z.coerce.number().nonnegative().finite(),
 });
+
+const candleSchema = z.object({ data: z.array(candleRowSchema) });
+
+async function parseJson(response: Response) {
+  if (!response.ok) throw providerHttpError("Fugle", response.status);
+  try {
+    return await response.json();
+  } catch {
+    throw new ProviderError("INVALID_RESPONSE", "Fugle 回傳無法解析的資料。");
+  }
+}
+
+function timestampToIso(value?: number | null) {
+  if (!value) return new Date().toISOString();
+  const milliseconds =
+    value > 100_000_000_000_000
+      ? Math.floor(value / 1000)
+      : value > 100_000_000_000
+        ? value
+        : value * 1000;
+  const date = new Date(milliseconds);
+  if (Number.isNaN(date.getTime()))
+    throw new ProviderError(
+      "INVALID_MARKET_DATE",
+      "Fugle 回傳不正確的行情時間。",
+    );
+  return date.toISOString();
+}
+
+function exchange(value: string): LiveQuote["exchange"] {
+  return value === "TWSE" ? "TWSE" : value === "TPEx" ? "TPEx" : "UNKNOWN";
+}
 
 export async function fetchFugleIntradayCandles(
   symbol: string,
@@ -46,7 +78,7 @@ export async function fetchFugleIntradayCandles(
 ): Promise<PriceCandle[]> {
   const timeframe = interval.replace("m", "");
   if (!["1", "5", "15", "30", "60"].includes(timeframe))
-    throw new Error("Fugle 不支援此分鐘週期");
+    throw new ProviderError("INVALID_RESPONSE", "Fugle 不支援此分鐘週期。");
   const url = new URL(
     `${BASE_URL}/intraday/candles/${encodeURIComponent(symbol)}`,
   );
@@ -56,9 +88,26 @@ export async function fetchFugleIntradayCandles(
     signal: AbortSignal.timeout(6_000),
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(`Fugle 分鐘 K HTTP ${response.status}`);
-  const parsed = candleSchema.parse(await response.json());
-  return parsed.data
+  const parsed = candleSchema.safeParse(await parseJson(response));
+  if (!parsed.success)
+    throw new ProviderError(
+      "INVALID_RESPONSE",
+      "Fugle 分鐘 K 回傳格式不正確。",
+    );
+  if (parsed.data.data.length === 0)
+    throw new ProviderError("EMPTY_DATA", "Fugle 分鐘 K 沒有資料。 ");
+  for (const row of parsed.data.data) {
+    if (
+      row.high < Math.max(row.open, row.close) ||
+      row.low > Math.min(row.open, row.close) ||
+      row.high < row.low
+    )
+      throw new ProviderError(
+        "INVALID_RESPONSE",
+        "Fugle 分鐘 K OHLC 資料不一致。",
+      );
+  }
+  return parsed.data.data
     .map((item) => ({
       time: item.date,
       open: item.open,
@@ -70,25 +119,22 @@ export async function fetchFugleIntradayCandles(
     .sort((a, b) => a.time.localeCompare(b.time));
 }
 
+/** Strict Fugle quote provider. It never calls FinMind or Mock providers. */
 export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider {
-  private readonly fallback = new MockRealtimeTaiwanProvider();
-
   constructor(private readonly apiKey: string) {}
 
-  async search(query: string, limit = 20) {
-    try {
-      return await searchFinMindSecurities(query, limit);
-    } catch {
-      return process.env.DATA_MODE === "live"
-        ? []
-        : this.fallback.search(query, limit);
-    }
+  async search(_query: string, _limit = 20): Promise<TaiwanSecurity[]> {
+    void _query;
+    void _limit;
+    throw new ProviderError(
+      "PROVIDER_UNAVAILABLE",
+      "Fugle quote provider 不提供股票清單搜尋。",
+    );
   }
 
   async getQuotes(symbols: string[]): Promise<LiveQuote[]> {
-    const fallback = await this.fallback.getQuotes(symbols);
     return Promise.all(
-      symbols.map(async (symbol, index) => {
+      symbols.map(async (symbol) => {
         try {
           const response = await fetch(
             `${BASE_URL}/intraday/quote/${encodeURIComponent(symbol)}`,
@@ -98,16 +144,26 @@ export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider
               cache: "no-store",
             },
           );
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const quote = quoteSchema.parse(await response.json());
+          const parsed = quoteSchema.safeParse(await parseJson(response));
+          if (!parsed.success)
+            throw new ProviderError(
+              "INVALID_RESPONSE",
+              "Fugle 行情回傳格式不正確。",
+            );
+          const quote = parsed.data;
+          if (quote.symbol !== symbol)
+            throw new ProviderError(
+              "INVALID_RESPONSE",
+              "Fugle 回傳的股票代碼不一致。",
+            );
           const price = quote.lastPrice ?? quote.closePrice ?? null;
-          const asOf = quote.lastUpdated
-            ? new Date(Math.floor(quote.lastUpdated / 1000)).toISOString()
-            : new Date().toISOString();
+          if (price === null)
+            throw new ProviderError("EMPTY_DATA", "Fugle 行情沒有成交價格。 ");
+          const fetchedAt = new Date().toISOString();
           return {
             symbol: quote.symbol,
-            name: quote.name,
-            exchange: quote.exchange === "TWSE" ? "TWSE" : "TPEx",
+            name: quote.name || symbol,
+            exchange: exchange(quote.exchange),
             market: "TW",
             price,
             previousClose: quote.previousClose ?? null,
@@ -117,36 +173,25 @@ export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider
             change: quote.change ?? null,
             changePercent: quote.changePercent ?? null,
             volume: quote.total?.tradeVolume ?? null,
-            asOf,
+            asOf: timestampToIso(quote.lastUpdated),
+            fetchedAt,
             sourceName: "Fugle 即時行情",
             sourceUrl: `${BASE_URL}/intraday/quote/${symbol}`,
             dataMode: "live",
             isDelayed: false,
             status: quote.isClose ? "closed" : "open",
+            lastSuccessfulFetchAt: fetchedAt,
           } satisfies LiveQuote;
         } catch (error) {
-          if (process.env.DATA_MODE === "live")
-            return unavailableQuote(
-              symbol,
-              "Fugle 暫時無法取得",
-              `Fugle 取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
-            );
-          return {
-            ...fallback[index],
-            error: `Fugle 取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
-          };
+          const normalized = normalizeProviderError(error, "Fugle");
+          return unavailableQuote(
+            symbol,
+            "Fugle 即時行情",
+            normalized.message,
+            normalized.code,
+          );
         }
       }),
     );
-  }
-
-  async getCandles(symbol: string, limit = 320) {
-    try {
-      return await fetchFinMindCandles(symbol, limit);
-    } catch {
-      return process.env.DATA_MODE === "live"
-        ? []
-        : this.fallback.getCandles(symbol, limit);
-    }
   }
 }

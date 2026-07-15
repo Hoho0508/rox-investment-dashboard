@@ -160,6 +160,7 @@ export class MockRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider 
       const latest = candles.at(-1)!;
       const previous = candles.at(-2)!;
       const change = latest.close - previous.close;
+      const fetchedAt = new Date().toISOString();
       return {
         ...security,
         price: latest.close,
@@ -170,12 +171,14 @@ export class MockRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider 
         change,
         changePercent: (change / previous.close) * 100,
         volume: latest.volume,
-        asOf: new Date().toISOString(),
+        asOf: fetchedAt,
+        fetchedAt,
         sourceName: "Rox 模擬盤中行情",
         dataMode: "mock",
         isDelayed: true,
         status: "mock",
-        error: "尚未設定即時行情 API 金鑰。",
+        errorCode: "MOCK_DATA",
+        errorMessage: "目前為 DATA_MODE=mock 的示範行情。",
       };
     });
   }

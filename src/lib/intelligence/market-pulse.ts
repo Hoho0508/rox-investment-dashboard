@@ -65,12 +65,22 @@ export function buildMarketPulse(report: MorningReport): MarketPulse {
     strongestGroups:
       report.dataMode === "mock"
         ? ["記憶體（示範）", "AI（示範）", "軍工（示範）"]
-        : ["半導體", "AI 伺服器", "電子權值"],
-    fundFlows: [
-      { sector: "電子", direction: technologyDirection },
-      { sector: "金融", direction: "→" },
-      { sector: "傳產", direction: technologyDirection === "↑" ? "↓" : "→" },
-    ],
+        : ["尚無正式族群資料"],
+    fundFlows:
+      report.dataMode === "mock"
+        ? [
+            { sector: "電子", direction: technologyDirection },
+            { sector: "金融", direction: "→" },
+            {
+              sector: "傳產",
+              direction: technologyDirection === "↑" ? "↓" : "→",
+            },
+          ]
+        : [
+            { sector: "電子", direction: "—" },
+            { sector: "金融", direction: "—" },
+            { sector: "傳產", direction: "—" },
+          ],
     narrative:
       report.dataMode === "mock"
         ? "市場交易主題尚待新聞與族群資金流 API 驗證"
@@ -89,6 +99,8 @@ export function buildMarketPulse(report: MorningReport): MarketPulse {
     warning:
       report.dataMode === "mock"
         ? "族群、資金流與市場主題為版型示範，不代表今日真實市場。"
-        : undefined,
+        : report.dataMode === "stale"
+          ? "行情更新失敗，市場情緒使用上一筆成功資料；族群與資金流仍 unavailable。"
+          : "族群與資金流 Provider 尚未串接，相關欄位保持 unavailable。",
   };
 }

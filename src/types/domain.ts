@@ -1,17 +1,31 @@
-export type DataMode = "mock" | "manual" | "live" | "unavailable";
+export const DATA_MODES = [
+  "live",
+  "delayed",
+  "stale",
+  "manual",
+  "mock",
+  "unavailable",
+] as const;
+
+export type DataMode = (typeof DATA_MODES)[number];
 export type Level = "低" | "中" | "高" | "未知";
 
-export type DataPoint<T> = {
+export type DataEnvelope<T> = {
   value: T | null;
+  dataMode: DataMode;
   sourceName: string;
   sourceUrl?: string;
-  fetchedAt: string;
   marketDate?: string;
+  fetchedAt: string;
+  lastSuccessfulFetchAt?: string;
   isDelayed: boolean;
-  dataMode: DataMode;
   confidence: number;
-  error?: string;
+  errorCode?: string;
+  errorMessage?: string;
 };
+
+/** @deprecated Use DataEnvelope. Kept while stored report payloads migrate. */
+export type DataPoint<T> = DataEnvelope<T>;
 
 export type MarketQuote = {
   symbol: string;

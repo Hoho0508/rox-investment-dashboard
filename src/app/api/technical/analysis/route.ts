@@ -1,6 +1,10 @@
 import { requireOwnerSession } from "@/lib/auth/request";
+import { resolveRuntimeDataMode } from "@/lib/config/data-mode";
 import { getTaiwanCandleSeries } from "@/lib/market";
-import { analyzeTechnicalSeries } from "@/lib/technical/analyze";
+import {
+  analyzeTechnicalSeries,
+  assertTechnicalAnalysisInput,
+} from "@/lib/technical/analyze";
 import { taiwanSymbolSchema } from "@/lib/validation/schemas";
 import { candleIntervals } from "@/types/market";
 import { z } from "zod";
@@ -19,9 +23,28 @@ export async function GET(request: Request) {
       { status: 400 },
     );
   const series = await getTaiwanCandleSeries(symbol.data, interval.data);
+  try {
+    assertTechnicalAnalysisInput(series, resolveRuntimeDataMode().mode);
+  } catch (error) {
+    return Response.json(
+      {
+        series,
+        analysis: null,
+        errorCode: "MOCK_INPUT_REJECTED",
+        errorMessage:
+          error instanceof Error ? error.message : "技術分析輸入不合法。",
+      },
+      { status: 422 },
+    );
+  }
   if (series.candles.length < 30)
     return Response.json(
-      { series, analysis: null, error: series.error ?? "K 線數量不足。" },
+      {
+        series,
+        analysis: null,
+        errorCode: series.errorCode ?? "INSUFFICIENT_DATA",
+        errorMessage: series.errorMessage ?? "K 線數量不足。",
+      },
       { status: 422 },
     );
   return Response.json(

@@ -4,10 +4,15 @@ import {
   findSimilarMarketPeriods,
 } from "@/lib/analysis/market-patterns";
 import { FinMindDelayedTaiwanProvider } from "@/lib/market/finmind-market";
+import { resetFinMindMarketCacheForTests } from "@/lib/market/finmind-market";
 import { MockRealtimeTaiwanProvider, mockCandles } from "@/lib/market/mock";
 
 describe("歷史市場分析", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    delete process.env.FINMIND_API_TOKEN;
+    resetFinMindMarketCacheForTests();
+    vi.unstubAllGlobals();
+  });
   it("以足夠歷史資料產生透明判斷與相似情境", () => {
     const candles = mockCandles("2330", 320);
     const analysis = analyzeMarketHistory("2330", candles);
@@ -32,10 +37,11 @@ describe("歷史市場分析", () => {
     expect(quote.symbol).toBe("9999");
     expect(quote.dataMode).toBe("mock");
     expect(quote.sourceName).toContain("模擬");
-    expect(quote.error).toContain("尚未設定");
+    expect(quote.errorCode).toBe("MOCK_DATA");
   });
 
   it("沒有盤中金鑰時以 FinMind 最新收盤價取代錯誤 Mock 價格", async () => {
+    process.env.FINMIND_API_TOKEN = "test-only-token";
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: URL | RequestInfo) => {
@@ -79,7 +85,7 @@ describe("歷史市場分析", () => {
     ]);
     expect(quote.price).toBe(1030);
     expect(quote.previousClose).toBe(1010);
-    expect(quote.dataMode).toBe("live");
+    expect(quote.dataMode).toBe("delayed");
     expect(quote.isDelayed).toBe(true);
     expect(quote.sourceName).toContain("FinMind");
   });

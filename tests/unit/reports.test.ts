@@ -6,6 +6,7 @@ import {
 } from "@/lib/reports/generate";
 import { REPORT_DEFINITIONS, parseReportType } from "@/lib/reports/config";
 import { sanitizeReportForDataAvailability } from "@/lib/reports/safety";
+import { assertReportCanBeStored } from "@/lib/reports/store";
 
 describe("晨報生成", () => {
   afterEach(() => {
@@ -83,6 +84,14 @@ describe("晨報生成", () => {
     expect(report.conclusion).toContain("目前資料不足");
     expect(report.conclusion).not.toContain("科技股情緒偏弱");
     expect(validateScenarioTotal(report)).toBe(true);
+  });
+
+  it("Live 模式拒絕儲存任何含 Mock lineage 的報告", async () => {
+    const report = await generateMorningReport();
+    expect(report.dataMode).toBe("mock");
+    expect(() => assertReportCanBeStored(report, { mode: "live" })).toThrow(
+      "拒絕儲存 Mock 報告",
+    );
   });
 
   it("讀取舊報告時會移除資料不足卻仍存在的推測敘事", async () => {

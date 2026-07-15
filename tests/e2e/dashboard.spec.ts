@@ -22,7 +22,7 @@ test("未登入會導向登入，錯誤密碼不建立 session", async ({ page }
 test("首頁顯示晨報、資料模式與固定聲明", async ({ page }) => {
   await login(page);
   await expect(page.getByRole("heading", { name: /市場晨報/ })).toBeVisible();
-  await expect(page.getByText("模擬資料", { exact: true })).toBeVisible();
+  await expect(page.getByText("MOCK", { exact: true })).toBeVisible();
   await expect(page.getByText(/不構成個人化投資建議/)).toBeVisible();
 });
 
@@ -86,7 +86,9 @@ test("股票獨立頁預設顯示 1 分鐘 K 與可解釋技術評分", async ({
   await expect(
     page.getByRole("button", { name: "1 分", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(/分鐘 K 為模擬資料/)).toBeVisible();
+  await expect(
+    page.locator("p.notice").filter({ hasText: "DATA_MODE=mock 的模擬分鐘 K" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "技術面判斷" })).toBeVisible();
   await expect(page.getByText("失效條件：", { exact: false })).toBeVisible();
 });

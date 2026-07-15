@@ -1,15 +1,56 @@
 import { prisma } from "@/lib/db/client";
+import {
+  isStrictDataMode,
+  resolveRuntimeDataMode,
+} from "@/lib/config/data-mode";
 import { taipeiDate } from "@/lib/reports/calendar";
 import { generateReport, validateScenarioTotal } from "@/lib/reports/generate";
 import { REPORT_DEFINITIONS, type ReportType } from "@/lib/reports/config";
 import { sanitizeReportForDataAvailability } from "@/lib/reports/safety";
-import type { DailyReport } from "@/types/domain";
+import { deriveAggregateDataMode } from "@/lib/providers/envelopes";
+import type { DailyReport, DataEnvelope } from "@/types/domain";
+
+type LegacyEnvelope<T> = DataEnvelope<T> & { error?: string };
+
+function normalizeStoredEnvelope<T>(point: LegacyEnvelope<T>): DataEnvelope<T> {
+  const dataMode =
+    point.dataMode === "live" && point.isDelayed ? "delayed" : point.dataMode;
+  return {
+    ...point,
+    dataMode,
+    lastSuccessfulFetchAt:
+      point.value !== null
+        ? (point.lastSuccessfulFetchAt ?? point.fetchedAt)
+        : point.lastSuccessfulFetchAt,
+    errorCode:
+      point.errorCode ?? (point.error ? "LEGACY_PROVIDER_ERROR" : undefined),
+    errorMessage: point.errorMessage ?? point.error,
+  };
+}
 
 function parseStoredReport(payload: string, id: string): DailyReport {
   const parsed = JSON.parse(payload) as Partial<DailyReport>;
+  const globalMarkets = (parsed.globalMarkets ?? []).map((item) => ({
+    ...item,
+    price: normalizeStoredEnvelope(item.price as LegacyEnvelope<number>),
+    changePercent: normalizeStoredEnvelope(
+      item.changePercent as LegacyEnvelope<number>,
+    ),
+  }));
+  const stocks = (parsed.stocks ?? []).map((item) => ({
+    ...item,
+    price: normalizeStoredEnvelope(item.price as LegacyEnvelope<number>),
+  }));
+  const allPoints = [
+    ...globalMarkets.flatMap((item) => [item.price, item.changePercent]),
+    ...stocks.map((item) => item.price),
+  ];
   const report = {
     ...parsed,
     id,
+    globalMarkets,
+    stocks,
+    dataMode: deriveAggregateDataMode(allPoints),
     reportType: parsed.reportType ?? "morning",
     scenarioModelAvailable:
       parsed.scenarioModelAvailable ??
@@ -19,6 +60,7 @@ function parseStoredReport(payload: string, id: string): DailyReport {
 }
 
 export async function saveReport(report: DailyReport) {
+  assertReportCanBeStored(report);
   if (!validateScenarioTotal(report))
     throw new Error("情境機率合計必須為 100%。");
   return prisma.morningReport.upsert({
@@ -50,6 +92,22 @@ export async function saveReport(report: DailyReport) {
   });
 }
 
+export function assertReportCanBeStored(
+  report: DailyReport,
+  resolution = resolveRuntimeDataMode(),
+) {
+  const containsMock =
+    report.dataMode === "mock" ||
+    report.globalMarkets.some(
+      (item) =>
+        item.price.dataMode === "mock" ||
+        item.changePercent.dataMode === "mock",
+    ) ||
+    report.stocks.some((item) => item.price.dataMode === "mock");
+  if (isStrictDataMode(resolution.mode) && containsMock)
+    throw new Error("Live/Production 模式拒絕儲存 Mock 報告。");
+}
+
 export async function getLatestReport(
   reportType: ReportType = "morning",
 ): Promise<DailyReport | null> {
@@ -59,7 +117,8 @@ export async function getLatestReport(
   });
   if (!row) return null;
   const report = parseStoredReport(row.payload, row.id);
-  return process.env.DATA_MODE === "live" && report.dataMode === "mock"
+  return isStrictDataMode(resolveRuntimeDataMode().mode) &&
+    report.dataMode === "mock"
     ? null
     : report;
 }
@@ -73,7 +132,8 @@ export async function getReportByDate(
   });
   if (!row) return null;
   const report = parseStoredReport(row.payload, row.id);
-  return process.env.DATA_MODE === "live" && report.dataMode === "mock"
+  return isStrictDataMode(resolveRuntimeDataMode().mode) &&
+    report.dataMode === "mock"
     ? null
     : report;
 }
@@ -96,7 +156,8 @@ export async function runReportJob(
     where: { reportDate_reportType: { reportDate, reportType } },
   });
   const staleMockInLiveMode =
-    process.env.DATA_MODE === "live" && existing?.dataMode === "mock";
+    isStrictDataMode(resolveRuntimeDataMode().mode) &&
+    existing?.dataMode === "mock";
   if (existing && !options.force && !staleMockInLiveMode)
     return { status: "duplicate" as const, id: existing.id, reportDate };
   const maxRetries = Math.max(

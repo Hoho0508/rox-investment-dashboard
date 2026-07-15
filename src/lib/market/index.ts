@@ -1,45 +1,67 @@
+import { fetchFinMindCandles } from "@/lib/market/finmind-market";
+import { fetchFugleIntradayCandles } from "@/lib/market/fugle";
+import { mockCandles, mockIntradayCandles } from "@/lib/market/mock";
+import { normalizeProviderError } from "@/lib/providers/errors";
+import { resolveRuntimeDataMode } from "@/lib/config/data-mode";
 import {
-  FinMindDelayedTaiwanProvider,
-  fetchFinMindCandles,
-  searchFinMindSecurities,
-} from "@/lib/market/finmind-market";
-import {
-  fetchFugleIntradayCandles,
-  FugleRealtimeTaiwanProvider,
-} from "@/lib/market/fugle";
-import {
-  mockIntradayCandles,
-  MockRealtimeTaiwanProvider,
-} from "@/lib/market/mock";
-import type { CandleInterval, CandleSeries, PriceCandle } from "@/types/market";
+  createRealtimeTaiwanProvider,
+  createTaiwanSearchProvider,
+  selectCandleSource,
+} from "@/lib/providers/provider-factory";
+import type {
+  CandleInterval,
+  CandleSeries,
+  PriceCandle,
+  TaiwanSecuritySearchResult,
+} from "@/types/market";
 
-const mock = new MockRealtimeTaiwanProvider();
-const finMindDelayed = new FinMindDelayedTaiwanProvider();
+const candleCache = new Map<string, CandleSeries>();
 
 export function getRealtimeTaiwanProvider() {
-  const key = process.env.FUGLE_MARKETDATA_API_KEY;
-  return key ? new FugleRealtimeTaiwanProvider(key) : finMindDelayed;
+  return createRealtimeTaiwanProvider();
 }
 
-export async function searchTaiwanSecurities(query: string, limit = 20) {
+export async function searchTaiwanSecurities(
+  query: string,
+  limit = 20,
+): Promise<TaiwanSecuritySearchResult> {
+  const resolution = resolveRuntimeDataMode();
+  const fetchedAt = new Date().toISOString();
   try {
-    return await searchFinMindSecurities(query, limit);
-  } catch {
-    return process.env.DATA_MODE === "live" ? [] : mock.search(query, limit);
+    const value = await createTaiwanSearchProvider(resolution).search(
+      query,
+      limit,
+    );
+    return {
+      value,
+      dataMode: resolution.mode === "mock" ? "mock" : "live",
+      sourceName:
+        resolution.mode === "mock"
+          ? "Rox Mock 股票清單"
+          : "FinMind / TaiwanStockInfo",
+      fetchedAt,
+      lastSuccessfulFetchAt: fetchedAt,
+      isDelayed: resolution.mode !== "live",
+      confidence: resolution.mode === "mock" ? 50 : 90,
+    };
+  } catch (error) {
+    const normalized = normalizeProviderError(error, "台股股票清單");
+    return {
+      value: null,
+      dataMode: "unavailable",
+      sourceName: "台股股票清單",
+      fetchedAt,
+      isDelayed: true,
+      confidence: 0,
+      errorCode: normalized.code,
+      errorMessage: normalized.message,
+    };
   }
 }
 
 export async function getTaiwanCandles(symbol: string, limit = 320) {
-  try {
-    const rows = await fetchFinMindCandles(symbol, limit);
-    return rows.length >= 80 || process.env.DATA_MODE === "live"
-      ? rows
-      : mock.getCandles(symbol, limit);
-  } catch {
-    return process.env.DATA_MODE === "live"
-      ? []
-      : mock.getCandles(symbol, limit);
-  }
+  const series = await getTaiwanCandleSeries(symbol, "1d", limit);
+  return series.candles;
 }
 
 function aggregateCandles(
@@ -73,128 +95,147 @@ function aggregateCandles(
   }));
 }
 
-export async function getTaiwanCandleSeries(
+function unavailableSeries(
   symbol: string,
   interval: CandleInterval,
-): Promise<CandleSeries> {
-  const now = new Date().toISOString();
-  if (interval === "tick")
-    return {
-      symbol,
-      interval,
-      candles: [],
-      sourceName: "尚未啟用 Tick 儲存層",
-      dataMode: "unavailable",
-      isDelayed: true,
-      supportsLive: false,
-      asOf: now,
-      error: "Tick 需要 Fugle trades 串流與伺服器端時序儲存，已列入 Roadmap。",
-    };
-
-  if (["1m", "5m", "15m", "30m", "60m"].includes(interval)) {
-    const apiKey = process.env.FUGLE_MARKETDATA_API_KEY;
-    if (apiKey) {
-      try {
-        const candles = await fetchFugleIntradayCandles(
-          symbol,
-          interval,
-          apiKey,
-        );
-        return {
-          symbol,
-          interval,
-          candles,
-          sourceName: "Fugle Intraday Candles",
-          sourceUrl:
-            "https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles",
-          dataMode: "live",
-          isDelayed: false,
-          supportsLive: true,
-          asOf: candles.at(-1)?.time ?? now,
-        };
-      } catch (error) {
-        if (process.env.DATA_MODE === "live")
-          return {
-            symbol,
-            interval,
-            candles: [],
-            sourceName: "Fugle 暫時無法取得",
-            dataMode: "unavailable",
-            isDelayed: true,
-            supportsLive: false,
-            asOf: now,
-            error:
-              error instanceof Error ? error.message : "Fugle 分鐘 K 取得失敗",
-          };
-        const candles = mockIntradayCandles(symbol, interval);
-        return {
-          symbol,
-          interval,
-          candles,
-          sourceName: "Rox 模擬分鐘 K",
-          dataMode: "mock",
-          isDelayed: true,
-          supportsLive: false,
-          asOf: now,
-          error:
-            error instanceof Error ? error.message : "Fugle 分鐘 K 取得失敗",
-        };
-      }
-    }
-    if (process.env.DATA_MODE === "live")
-      return {
-        symbol,
-        interval,
-        candles: [],
-        sourceName: "尚未設定 Fugle",
-        dataMode: "unavailable",
-        isDelayed: true,
-        supportsLive: false,
-        asOf: now,
-        error: "未設定 FUGLE_MARKETDATA_API_KEY，未顯示模擬資料。",
-      };
-    const candles = mockIntradayCandles(symbol, interval);
-    return {
-      symbol,
-      interval,
-      candles,
-      sourceName: "Rox 模擬分鐘 K",
-      dataMode: "mock",
-      isDelayed: true,
-      supportsLive: false,
-      asOf: now,
-      error: "未設定 FUGLE_MARKETDATA_API_KEY，分鐘 K 為模擬資料。",
-    };
-  }
-
-  const daily = await getTaiwanCandles(symbol, 520);
-  if (daily.length === 0)
-    return {
-      symbol,
-      interval,
-      candles: [],
-      sourceName: "FinMind 暫時無法取得",
-      dataMode: "unavailable",
-      isDelayed: true,
-      supportsLive: false,
-      asOf: now,
-      error: "FinMind 日 K 暫時無法取得，未顯示模擬資料。",
-    };
-  const candles =
-    interval === "1d"
-      ? daily
-      : interval === "1w"
-        ? aggregateCandles(daily, "1w")
-        : aggregateCandles(daily, "1mo");
+  errorCode: string,
+  errorMessage: string,
+): CandleSeries {
+  const fetchedAt = new Date().toISOString();
   return {
     symbol,
     interval,
-    candles,
-    sourceName: "FinMind / TaiwanStockPrice",
-    sourceUrl: "https://api.finmindtrade.com/api/v4/data",
-    dataMode: "live",
+    candles: [],
+    sourceName: "尚無可用正式 K 線",
+    dataMode: "unavailable",
     isDelayed: true,
     supportsLive: false,
-    asOf: candles.at(-1)?.time ?? now,
+    asOf: fetchedAt,
+    fetchedAt,
+    errorCode,
+    errorMessage,
   };
+}
+
+function staleOrUnavailable(
+  symbol: string,
+  interval: CandleInterval,
+  errorCode: string,
+  errorMessage: string,
+) {
+  const cached = candleCache.get(`${symbol}:${interval}`);
+  if (!cached)
+    return unavailableSeries(symbol, interval, errorCode, errorMessage);
+  return {
+    ...cached,
+    dataMode: "stale" as const,
+    isDelayed: true,
+    fetchedAt: new Date().toISOString(),
+    lastSuccessfulFetchAt: cached.lastSuccessfulFetchAt ?? cached.fetchedAt,
+    errorCode,
+    errorMessage,
+  };
+}
+
+export async function getTaiwanCandleSeries(
+  symbol: string,
+  interval: CandleInterval,
+  limit = interval === "1d" || interval === "1w" || interval === "1mo"
+    ? 520
+    : 320,
+): Promise<CandleSeries> {
+  const source = selectCandleSource(interval);
+  const fetchedAt = new Date().toISOString();
+
+  if (source.kind === "unavailable")
+    return staleOrUnavailable(
+      symbol,
+      interval,
+      source.errorCode,
+      source.errorMessage,
+    );
+
+  if (source.kind === "mock") {
+    const isIntraday = ["1m", "5m", "15m", "30m", "60m"].includes(interval);
+    const candles = isIntraday
+      ? mockIntradayCandles(symbol, interval)
+      : interval === "tick"
+        ? []
+        : mockCandles(symbol, limit);
+    if (interval === "tick")
+      return unavailableSeries(
+        symbol,
+        interval,
+        "PROVIDER_UNAVAILABLE",
+        "Mock mode 不提供 Tick 資料。",
+      );
+    const aggregated =
+      interval === "1w"
+        ? aggregateCandles(candles, "1w")
+        : interval === "1mo"
+          ? aggregateCandles(candles, "1mo")
+          : candles;
+    return {
+      symbol,
+      interval,
+      candles: aggregated,
+      sourceName: isIntraday ? "Rox 模擬分鐘 K" : "Rox 模擬日 K",
+      dataMode: "mock",
+      isDelayed: true,
+      supportsLive: false,
+      asOf: aggregated.at(-1)?.time ?? fetchedAt,
+      fetchedAt,
+      errorCode: "MOCK_DATA",
+      errorMessage: isIntraday
+        ? "目前為 DATA_MODE=mock 的模擬分鐘 K，不代表真實盤中行情。"
+        : "目前為 DATA_MODE=mock 的模擬 K 線，不代表真實市場行情。",
+    };
+  }
+
+  try {
+    const raw =
+      source.kind === "fugle"
+        ? await fetchFugleIntradayCandles(symbol, interval, source.apiKey)
+        : await fetchFinMindCandles(symbol, limit);
+    const candles =
+      interval === "1w"
+        ? aggregateCandles(raw, "1w")
+        : interval === "1mo"
+          ? aggregateCandles(raw, "1mo")
+          : raw;
+    const series: CandleSeries = {
+      symbol,
+      interval,
+      candles,
+      sourceName:
+        source.kind === "fugle"
+          ? "Fugle Intraday Candles"
+          : "FinMind / TaiwanStockPrice",
+      sourceUrl:
+        source.kind === "fugle"
+          ? "https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles"
+          : "https://api.finmindtrade.com/api/v4/data",
+      dataMode: source.kind === "fugle" ? "live" : "delayed",
+      isDelayed: source.kind !== "fugle",
+      supportsLive: source.kind === "fugle",
+      asOf: candles.at(-1)?.time ?? fetchedAt,
+      fetchedAt,
+      lastSuccessfulFetchAt: fetchedAt,
+    };
+    candleCache.set(`${symbol}:${interval}`, series);
+    return series;
+  } catch (error) {
+    const provider = source.kind === "fugle" ? "Fugle" : "FinMind";
+    const normalized = normalizeProviderError(error, provider);
+    return staleOrUnavailable(
+      symbol,
+      interval,
+      normalized.code,
+      normalized.message,
+    );
+  }
+}
+
+export function resetCandleCacheForTests() {
+  candleCache.clear();
 }

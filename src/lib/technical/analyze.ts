@@ -17,6 +17,18 @@ import type {
   TechnicalPosition,
   TechnicalZone,
 } from "@/types/technical";
+import type { RuntimeDataMode } from "@/lib/config/data-mode";
+
+export function assertTechnicalAnalysisInput(
+  series: CandleSeries,
+  runtimeMode: RuntimeDataMode,
+) {
+  if (
+    (runtimeMode === "live" || runtimeMode === "unavailable") &&
+    series.dataMode === "mock"
+  )
+    throw new Error("Live/Production 模式拒絕使用 Mock K 線進行技術評分。");
+}
 
 const round = (value: number | null, digits = 2) =>
   value === null ? null : Number(value.toFixed(digits));
