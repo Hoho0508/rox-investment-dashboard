@@ -119,6 +119,57 @@ export async function fetchFugleIntradayCandles(
     .sort((a, b) => a.time.localeCompare(b.time));
 }
 
+export async function fetchFugleCandles(
+  symbol: string,
+  interval: CandleInterval,
+  apiKey: string,
+): Promise<PriceCandle[]> {
+  if (["1m", "5m", "15m", "30m", "60m"].includes(interval))
+    return fetchFugleIntradayCandles(symbol, interval, apiKey);
+  const timeframe = interval === "1w" ? "W" : interval === "1mo" ? "M" : "D";
+  const years = interval === "1mo" ? 15 : interval === "1w" ? 8 : 3;
+  const from = new Date();
+  from.setUTCFullYear(from.getUTCFullYear() - years);
+  const url = new URL(
+    `${BASE_URL}/historical/candles/${encodeURIComponent(symbol)}`,
+  );
+  url.searchParams.set("from", from.toISOString().slice(0, 10));
+  url.searchParams.set("to", new Date().toISOString().slice(0, 10));
+  url.searchParams.set("timeframe", timeframe);
+  url.searchParams.set("adjusted", "true");
+  url.searchParams.set("fields", "open,high,low,close,volume");
+  url.searchParams.set("sort", "asc");
+  const response = await fetch(url, {
+    headers: { "X-API-KEY": apiKey, Accept: "application/json" },
+    signal: AbortSignal.timeout(6_000),
+    next: { revalidate: 300 },
+  });
+  const parsed = candleSchema.safeParse(await parseJson(response));
+  if (!parsed.success)
+    throw new ProviderError(
+      "INVALID_RESPONSE",
+      "Fugle 歷史 K 線回傳格式不正確。",
+    );
+  if (parsed.data.data.length === 0)
+    throw new ProviderError("EMPTY_DATA", "Fugle 歷史 K 線沒有資料。 ");
+  return parsed.data.data
+    .filter(
+      (row) =>
+        row.high >= Math.max(row.open, row.close) &&
+        row.low <= Math.min(row.open, row.close) &&
+        row.high >= row.low,
+    )
+    .map((item) => ({
+      time: item.date,
+      open: item.open,
+      high: item.high,
+      low: item.low,
+      close: item.close,
+      volume: item.volume,
+    }))
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
+
 /** Strict Fugle quote provider. It never calls FinMind or Mock providers. */
 export class FugleRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider {
   constructor(private readonly apiKey: string) {}

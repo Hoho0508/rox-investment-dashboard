@@ -1,6 +1,23 @@
 # Test Report
 
-執行日期：2026-07-15。所有驗證均在本機 repository 執行，沒有連線或修改 Vercel Production。
+執行日期：2026-07-15。
+
+## Production 正式股票資料與互動回饋
+
+| Command             | Result | Evidence                                                        |
+| ------------------- | ------ | --------------------------------------------------------------- |
+| `pnpm format:check` | PASS   | Prettier 全部符合。                                             |
+| `pnpm lint`         | PASS   | ESLint 0 warnings。                                             |
+| `pnpm typecheck`    | PASS   | TypeScript noEmit 通過。                                        |
+| `pnpm test`         | PASS   | 11 files、57 tests。                                            |
+| `pnpm test:e2e`     | PASS   | Desktop Chrome + iPhone 13，共 16 tests，21.0 秒。              |
+| `pnpm build`        | PASS   | Next.js 16.2.10，17 個頁面與 API routes 完成 production build。 |
+
+`DATA_MODE=live` 的實際網路 smoke test 在未讀取或輸出任何秘密值下成功：晨報、午盤與盤後各在 0.3～0.7 秒完成；2330、NVDA、2317 均取得延遲正式價格，來源為 Yahoo Finance Chart（若正式環境 Fugle 可用則由 Factory 優先選用）。TWSE 與 Yahoo fundamentals 成功取得 EPS、營收成長、EPS 成長、毛利率、自由現金流與歷史／目前本益比，三情境機率各報告均合計 100%。
+
+預估本益比仍為 `null`：它需要具授權的分析師一致預期資料，測試確認程式不會將歷史本益比或 Mock 值冒充預估值。Goodinfo 目前回傳 Cloudflare 人機驗證頁，沒有繞過驗證或將該頁面納入自動化來源。
+
+互動回饋已加入 report generation、行情搜尋與刷新按鈕；開始請求時立即進入 pending 狀態，禁止重複點擊，並提供 timeout／失敗訊息。桌面與手機主要流程均通過。
 
 ## 官方跨市場資料模組
 

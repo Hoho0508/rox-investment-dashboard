@@ -13,7 +13,8 @@ export default async function DataStatusPage() {
       </div>
       <div className="notice">
         正式站採嚴格真實資料模式。尚未串接或暫時失效的來源會顯示缺少資料，不使用
-        Mock 數值補位。
+        Mock 數值補位。正式來源包含 Fugle、Yahoo
+        Finance、臺灣證券交易所、櫃買中心與美國財政部。
       </div>
       <div className="card section">
         <div className="table-wrap">

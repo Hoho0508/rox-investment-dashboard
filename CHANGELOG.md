@@ -4,6 +4,16 @@
 
 ## Unreleased
 
+### Production Equity Data and Responsiveness
+
+- 晨報、午盤與盤後核心股票不再以 FinMind Token 為必要條件；Live Factory 依序使用 Fugle、Yahoo Finance Chart 與 TWSE／TPEx 正式行情，全部失敗才回 stale 或 unavailable。
+- 新增 Yahoo Finance 延遲 K 線，支援 1／5／15／30／60 分鐘與日／週／月；有 Fugle 或 FinMind 授權時仍優先使用其支援的正式週期。
+- 新增 TWSE／TPEx 全市場清單、搜尋與收盤行情 Adapter，以及 NVDA Yahoo Finance 延遲行情。
+- 新增 TWSE 月營收、EPS、毛利率、本益比與 Yahoo 歷史財務 time-series，顯示營收成長、EPS 成長、自由現金流與趨勢；缺少合法分析師一致預期時不捏造預估本益比。
+- 午盤與盤後結論改為引用實際市場證據，三種情境機率仍固定合計 100%。
+- 報告產生、行情搜尋與更新按鈕加入立即載入回饋、重複請求保護、逾時與錯誤訊息；新增全頁 route loading 狀態。
+- Production 部署政策改為：擁有者在當次工作明確授權，且格式、lint、typecheck、單元、桌面／手機 E2E 與 build 全部通過後才可部署；Production 永不使用 Mock。
+
 ### Official Cross-Market Context
 
 - 新增免登入、免付費的官方跨市場 Provider：臺灣證券交易所 OpenAPI 提供 TAIEX、臺灣 50、臺灣資訊科技指數；美國財政部 XML Feed 提供 2 年與 10 年公債殖利率。

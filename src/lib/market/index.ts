@@ -1,6 +1,7 @@
 import { fetchFinMindCandles } from "@/lib/market/finmind-market";
-import { fetchFugleIntradayCandles } from "@/lib/market/fugle";
+import { fetchFugleCandles } from "@/lib/market/fugle";
 import { mockCandles, mockIntradayCandles } from "@/lib/market/mock";
+import { fetchYahooCandles } from "@/lib/market/yahoo";
 import { normalizeProviderError } from "@/lib/providers/errors";
 import { resolveRuntimeDataMode } from "@/lib/config/data-mode";
 import {
@@ -34,14 +35,14 @@ export async function searchTaiwanSecurities(
     );
     return {
       value,
-      dataMode: resolution.mode === "mock" ? "mock" : "live",
+      dataMode: resolution.mode === "mock" ? "mock" : "delayed",
       sourceName:
         resolution.mode === "mock"
           ? "Rox Mock 股票清單"
-          : "FinMind / TaiwanStockInfo",
+          : "臺灣證券交易所與櫃買中心 OpenAPI",
       fetchedAt,
       lastSuccessfulFetchAt: fetchedAt,
-      isDelayed: resolution.mode !== "live",
+      isDelayed: true,
       confidence: resolution.mode === "mock" ? 50 : 90,
     };
   } catch (error) {
@@ -195,26 +196,33 @@ export async function getTaiwanCandleSeries(
   try {
     const raw =
       source.kind === "fugle"
-        ? await fetchFugleIntradayCandles(symbol, interval, source.apiKey)
-        : await fetchFinMindCandles(symbol, limit);
-    const candles =
-      interval === "1w"
+        ? await fetchFugleCandles(symbol, interval, source.apiKey)
+        : source.kind === "finmind"
+          ? await fetchFinMindCandles(symbol, limit)
+          : (await fetchYahooCandles(symbol, interval, limit)).candles;
+    const normalized =
+      source.kind === "finmind" && interval === "1w"
         ? aggregateCandles(raw, "1w")
-        : interval === "1mo"
+        : source.kind === "finmind" && interval === "1mo"
           ? aggregateCandles(raw, "1mo")
           : raw;
+    const candles = normalized.slice(-limit);
     const series: CandleSeries = {
       symbol,
       interval,
       candles,
       sourceName:
         source.kind === "fugle"
-          ? "Fugle Intraday Candles"
-          : "FinMind / TaiwanStockPrice",
+          ? "Fugle Candles"
+          : source.kind === "finmind"
+            ? "FinMind / TaiwanStockPrice"
+            : "Yahoo Finance Chart",
       sourceUrl:
         source.kind === "fugle"
-          ? "https://api.fugle.tw/marketdata/v1.0/stock/intraday/candles"
-          : "https://api.finmindtrade.com/api/v4/data",
+          ? "https://api.fugle.tw/marketdata/v1.0/stock"
+          : source.kind === "finmind"
+            ? "https://api.finmindtrade.com/api/v4/data"
+            : "https://finance.yahoo.com",
       dataMode: source.kind === "fugle" ? "live" : "delayed",
       isDelayed: source.kind !== "fugle",
       supportsLive: source.kind === "fugle",
@@ -225,7 +233,12 @@ export async function getTaiwanCandleSeries(
     candleCache.set(`${symbol}:${interval}`, series);
     return series;
   } catch (error) {
-    const provider = source.kind === "fugle" ? "Fugle" : "FinMind";
+    const provider =
+      source.kind === "fugle"
+        ? "Fugle"
+        : source.kind === "finmind"
+          ? "FinMind"
+          : "Yahoo Finance";
     const normalized = normalizeProviderError(error, provider);
     return staleOrUnavailable(
       symbol,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildMarketPulse } from "@/lib/intelligence/market-pulse";
 import { getTaiwanCandleSeries } from "@/lib/market";
 import { mockCandles } from "@/lib/market/mock";
@@ -24,6 +24,7 @@ describe("V2 技術分析中心", () => {
     else process.env.FUGLE_MARKETDATA_API_KEY = originalFugleKey;
     if (originalDataMode === undefined) delete process.env.DATA_MODE;
     else process.env.DATA_MODE = originalDataMode;
+    vi.unstubAllGlobals();
   });
 
   it("正確計算基本趨勢、動能與波動指標", () => {
@@ -46,9 +47,13 @@ describe("V2 技術分析中心", () => {
     expect(series.errorMessage).toContain("DATA_MODE=mock");
   });
 
-  it("正式站沒有行情時保持空白，不生成模擬 K", async () => {
+  it("正式來源全部失敗時保持空白，不生成模擬 K", async () => {
     delete process.env.FUGLE_MARKETDATA_API_KEY;
     process.env.DATA_MODE = "live";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new Error("all live providers unavailable")),
+    );
     const series = await getTaiwanCandleSeries("2330", "1m");
     expect(series.candles).toEqual([]);
     expect(series.dataMode).toBe("unavailable");

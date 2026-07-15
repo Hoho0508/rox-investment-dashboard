@@ -80,3 +80,16 @@
 - **發現的風險：** 手動刷新會增加一次 Fugle／FinMind 呼叫，但需要有效登入且只 upsert 同一筆；不會刪除歷史資料或產生重複報告。
 - **跳過的項目：** 未修改任何 Token、帳號權限、評分權重或外部 Provider。
 - **下一輪建議：** 確認 Production 手動刷新後，台股價格是否取得 Fugle／FinMind 真實來源；缺少全球或美股 Provider 時維持空白。
+
+## Run 004 — 正式股票資料、三時段報告與互動回饋
+
+- **開始時間：** 2026-07-15 18:40 Asia/Taipei
+- **檢查結果：** 晨報核心股票仍依賴 FinMind，造成 2330／2317 缺 Token 即 unavailable；NVDA 尚無正式 Provider；午盤與盤後沿用共用資料層但正式股票資料不完整；按鈕送出後缺少足夠即時回饋。
+- **選擇的工作：** 在不使用新登入或付費服務下，建立 Yahoo Finance、TWSE、TPEx 正式 Adapter，補足核心股票與歷史基本面；讓晨報、午盤、盤後共用同一資料來源；改善報告與市場操作按鈕的 pending、timeout 與重複點擊保護。
+- **修改檔案：** `AGENTS.md`、`src/lib/market/yahoo.ts`、`src/lib/market/official-taiwan.ts`、`src/lib/providers/official-equity-market.ts`、Provider Factory、Fugle K 線、報告產生器、主要資料 UI、互動回饋、測試與專案文件。
+- **執行命令：** `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm test:e2e`、`pnpm build`、三時段 Live smoke test、`git diff --check`。
+- **測試結果：** Prettier、ESLint、TypeScript 通過；Vitest 11 個檔案共 57 個測試通過；Playwright 桌面與手機共 16 個測試通過；Next.js production build 通過。三時段實際來源 smoke test 均取得 2330、NVDA、2317 正式延遲價格，情境機率合計 100%。
+- **發現的風險：** Yahoo 公開端點沒有合約式即時保證，因此一律標示 DELAYED；預估本益比需分析師一致預期授權，保持 unavailable；Goodinfo 有 Cloudflare 驗證，不繞過。process-memory stale cache 仍不能跨 Vercel instance。
+- **跳過的項目：** 未建立帳號、未修改或輸出 Token、未購買服務、未繞過 Goodinfo 驗證、未改評分權重、未自動下單。
+- **需要核准的事項：** 未來若要逐筆即時美股或預估本益比，需另行核准有再散布與分析師預估授權的 Provider。
+- **下一輪建議：** 完成本次已明確授權的 Production 部署與三時段線上驗證後停止；下一輪優先處理跨 instance cache 與 API rate limit。

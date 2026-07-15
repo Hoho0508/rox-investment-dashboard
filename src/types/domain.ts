@@ -33,6 +33,18 @@ export type MarketQuote = {
   impact: string;
 };
 
+export type StockFundamentalValues = {
+  eps: number | null;
+  revenueGrowth: number | null;
+  epsGrowth: number | null;
+  grossMargin: number | null;
+  grossMarginTrend: number | null;
+  freeCashFlow: number | null;
+  freeCashFlowTrend: number | null;
+  trailingPe: number | null;
+  forwardPe: number | null;
+};
+
 export type StockSnapshot = {
   symbol: string;
   name: string;
@@ -44,6 +56,11 @@ export type StockSnapshot = {
   grossMarginTrend: number | null;
   freeCashFlowTrend: number | null;
   forwardPe: number | null;
+  /**
+   * Field-level values plus a traceable source. Optional for compatibility
+   * with reports stored before the official fundamentals provider existed.
+   */
+  fundamentals?: DataEnvelope<StockFundamentalValues>;
   outlook: "上修" | "穩定" | "下修" | "未知";
   thesisIntact: boolean | null;
   majorRisk: string;

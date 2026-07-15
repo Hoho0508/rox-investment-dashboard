@@ -33,4 +33,6 @@ There is no existing commit history from which to infer a convention. Use short,
 
 ## Security & Configuration
 
-Never commit credentials, tokens, private keys, or local environment files. Use only sanitized placeholders in `.env.example`. Read FinMind credentials only from `process.env.FINMIND_API_TOKEN`; missing or failed live data must fall back safely to clearly labelled Mock data. Keep authentication, cron, session, and database secrets server-side. Generated Prisma clients, test output, build output, and local databases remain ignored by Git.
+Never commit credentials, tokens, private keys, or local environment files. Use only sanitized placeholders in `.env.example`. Read FinMind credentials only from `process.env.FINMIND_API_TOKEN`; missing or failed Production data must return unavailable or a clearly labelled stale value, never Mock data. Mock is limited to explicit local development and deterministic automated tests. Keep authentication, cron, session, and database secrets server-side. Generated Prisma clients, test output, build output, and local databases remain ignored by Git.
+
+Production deployment is allowed when the repository owner explicitly approves it for the current task. Before deploying, run formatting, lint, typecheck, unit tests, relevant desktop/mobile E2E tests, and a production build. Never turn Production into Mock mode; deploy only traceable Live, delayed, stale, manual, or unavailable data states.

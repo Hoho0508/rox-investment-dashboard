@@ -4,9 +4,9 @@ import { unavailableQuote } from "@/lib/market/unavailable";
 import { FugleRealtimeTaiwanProvider } from "@/lib/market/fugle";
 import { FinMindMarketDataProvider } from "@/lib/providers/finmind";
 import {
-  createRealtimeTaiwanProvider,
   createReportMarketProvider,
   resetProviderCachesForTests,
+  selectCandleSource,
   StaleAwareRealtimeTaiwanProvider,
 } from "@/lib/providers/provider-factory";
 import type { LiveQuote } from "@/types/market";
@@ -77,13 +77,13 @@ describe("嚴格資料 Provider", () => {
     expect(stocks.every((stock) => stock.price.dataMode === "mock")).toBe(true);
   });
 
-  it("Live 模式沒有任何行情 Key 時報價 unavailable", async () => {
-    const [quote] = await createRealtimeTaiwanProvider({
-      mode: "live",
-    }).getQuotes(["2330"]);
-    expect(quote.dataMode).toBe("unavailable");
-    expect(quote.price).toBeNull();
-    expect(quote.errorCode).toBe("NOT_CONFIGURED");
+  it("Live 模式沒有行情 Key 時使用 Yahoo 真實 K 線，不使用 Mock", () => {
+    expect(selectCandleSource("1m", { mode: "live" })).toEqual({
+      kind: "yahoo",
+    });
+    expect(selectCandleSource("1d", { mode: "live" })).toEqual({
+      kind: "yahoo",
+    });
   });
 
   it("Fugle 網路失敗時回 unavailable 且不輸出 API Key", async () => {

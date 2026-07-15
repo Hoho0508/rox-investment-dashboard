@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CandlestickChart } from "@/components/candlestick-chart";
 import { DATA_MODE_LABELS, DataProvenance } from "@/components/data-provenance";
@@ -46,13 +46,19 @@ export function MarketWorkspace({
   const [analysis, setAnalysis] = useState<MarketAnalysis | null>(null);
   const [countdown, setCountdown] = useState(30);
   const [message, setMessage] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const refreshingRef = useRef(false);
   const symbols = useMemo(
     () => watchlist.map((item) => item.symbol),
     [watchlist],
   );
 
   const refreshQuotes = useCallback(async () => {
-    if (symbols.length === 0) return;
+    if (symbols.length === 0 || refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    setMessage("正在更新正式行情…");
     try {
       const response = await fetch(
         `/api/market/quotes?symbols=${encodeURIComponent(symbols.join(","))}`,
@@ -72,6 +78,9 @@ export function MarketWorkspace({
       setCountdown(payload.refreshAfterSeconds);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "行情更新失敗");
+    } finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
     }
   }, [symbols]);
 
@@ -121,12 +130,20 @@ export function MarketWorkspace({
 
   async function runSearch() {
     if (!search.trim()) return setResults([]);
-    const response = await fetch(
-      `/api/market/search?q=${encodeURIComponent(search.trim())}`,
-    );
-    const payload = (await response.json()) as TaiwanSecuritySearchResult;
-    setResults(payload.value ?? []);
-    setMessage(payload.errorMessage ?? "");
+    setSearching(true);
+    setMessage("正在搜尋證交所與櫃買中心清單…");
+    try {
+      const response = await fetch(
+        `/api/market/search?q=${encodeURIComponent(search.trim())}`,
+      );
+      const payload = (await response.json()) as TaiwanSecuritySearchResult;
+      setResults(payload.value ?? []);
+      setMessage(payload.errorMessage ?? "");
+    } catch {
+      setMessage("股票搜尋失敗，請稍後重試。");
+    } finally {
+      setSearching(false);
+    }
   }
 
   async function addSecurity(security: TaiwanSecurity) {
@@ -189,8 +206,13 @@ export function MarketWorkspace({
             placeholder="輸入 2330、台積電、聯發科…"
             value={search}
           />
-          <button onClick={() => void runSearch()} type="button">
-            搜尋
+          <button
+            aria-busy={searching}
+            disabled={searching}
+            onClick={() => void runSearch()}
+            type="button"
+          >
+            {searching ? "搜尋中…" : "搜尋"}
           </button>
         </div>
         {results.length > 0 && (
@@ -216,8 +238,13 @@ export function MarketWorkspace({
           <strong>自選即時追蹤</strong>
           <span>下一次更新 {countdown} 秒</span>
         </div>
-        <button onClick={() => void refreshQuotes()} type="button">
-          立即更新
+        <button
+          aria-busy={refreshing}
+          disabled={refreshing}
+          onClick={() => void refreshQuotes()}
+          type="button"
+        >
+          {refreshing ? "更新中…" : "立即更新"}
         </button>
       </div>
       {message && (

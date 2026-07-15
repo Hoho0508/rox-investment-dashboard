@@ -88,12 +88,10 @@ function reportNarrative(
   if (reportType === "midday") {
     return {
       keyPoints: [
+        ...officialEvidence,
         "午盤先檢查量價是否同步，不以半日漲幅直接追價",
-        "比較電子權值、金融與傳產的強弱是否一致",
-        "留意午後成交量與早盤方向是否出現背離",
       ],
-      conclusion:
-        "午盤以趨勢延續、量價配合與風險條件為主；若只有價格上漲而缺少成交量確認，維持觀察。",
+      conclusion: `${officialEvidence.join("；")}。午盤再以即時個股量價檢查趨勢是否延續；若只有價格變化而缺少成交量確認，維持觀察。`,
       discipline: [
         "不因早盤急漲追高",
         "等待量價確認",
@@ -103,13 +101,8 @@ function reportNarrative(
   }
   if (reportType === "close") {
     return {
-      keyPoints: [
-        "用收盤價確認今日突破或跌破是否成立",
-        "檢查成交量、主要權值股與市場廣度是否支持盤勢",
-        "記錄今日判斷，留待後續 5／20／60 日報酬驗證",
-      ],
-      conclusion:
-        "盤後以完整收盤資料重新檢查投資理由與風險；今日結果僅作研究證據，不直接等同明日方向。",
+      keyPoints: [...officialEvidence, "用收盤價確認今日突破或跌破是否成立"],
+      conclusion: `${officialEvidence.join("；")}。盤後以完整收盤資料重新檢查投資理由與風險；今日結果僅作研究證據，不直接等同明日方向。`,
       discipline: [
         "盤後不衝動下單",
         "複核投資理由與失效條件",
@@ -230,17 +223,41 @@ export async function generateReport(
       ? [`${stock.symbol}：${stock.price.errorMessage}`]
       : [],
   );
+  const fundamentalErrors = coreStocks.flatMap((stock) => {
+    const values = stock.fundamentals?.value;
+    const missing = [
+      values?.revenueGrowth === null || values?.revenueGrowth === undefined
+        ? "營收成長"
+        : undefined,
+      values?.epsGrowth === null || values?.epsGrowth === undefined
+        ? "EPS 成長"
+        : undefined,
+      values?.freeCashFlow === null || values?.freeCashFlow === undefined
+        ? "自由現金流"
+        : undefined,
+      values?.forwardPe === null || values?.forwardPe === undefined
+        ? "預估本益比"
+        : undefined,
+    ].filter((item): item is string => Boolean(item));
+    return missing.length
+      ? [`${stock.symbol}：${missing.join("、")} unavailable。`]
+      : [];
+  });
   const missingData = [
     resolution.warning,
     !scenarioModelAvailable
       ? "正式市場情境至少需要 TAIEX、TWTECH 與 US10Y；缺漏時不進行方向推估。"
       : undefined,
     ...providerErrors,
+    ...fundamentalErrors,
   ].filter((item): item is string => Boolean(item));
   const allPoints = [
-    ...globalMarkets.map((item) => item.price),
+    ...globalMarkets.flatMap((item) => [item.price, item.changePercent]),
     ...coreStocks.map((item) => item.price),
   ];
+  const fundamentalValues = coreStocks.flatMap((stock) =>
+    stock.fundamentals?.value ? Object.values(stock.fundamentals.value) : [],
+  );
   const latestDataAt =
     allPoints
       .map((item) => item.fetchedAt)
@@ -266,10 +283,11 @@ export async function generateReport(
     latestDataAt,
     dataMode: reportDataMode,
     completeness: Math.round(
-      (allPoints.filter(
+      ((allPoints.filter(
         (item) => item.value !== null && item.dataMode !== "mock",
-      ).length /
-        15) *
+      ).length +
+        fundamentalValues.filter((value) => value !== null).length) /
+        (allPoints.length + coreStocks.length * 9)) *
         100,
     ),
     isTradingDay,

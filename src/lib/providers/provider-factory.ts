@@ -3,17 +3,18 @@ import {
   type DataModeResolution,
 } from "@/lib/config/data-mode";
 import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
-import { FinMindDelayedTaiwanProvider } from "@/lib/market/finmind-market";
 import { FugleRealtimeTaiwanProvider } from "@/lib/market/fugle";
 import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
+import { OfficialTaiwanMarketProvider } from "@/lib/market/official-taiwan";
 import {
   unavailableQuote,
   UnavailableRealtimeTaiwanProvider,
 } from "@/lib/market/unavailable";
+import { YahooTaiwanMarketProvider } from "@/lib/market/yahoo";
 import type { MarketDataProvider } from "@/lib/providers/contracts";
-import { FinMindMarketDataProvider } from "@/lib/providers/finmind";
 import { ManualMarketDataProvider } from "@/lib/providers/manual-market";
 import { MockMarketDataProvider } from "@/lib/providers/mock-market";
+import { OfficialEquityMarketProvider } from "@/lib/providers/official-equity-market";
 import { OfficialGlobalMarketProvider } from "@/lib/providers/official-global-market";
 import { normalizeProviderError, ProviderError } from "@/lib/providers/errors";
 import { staleEnvelope } from "@/lib/providers/envelopes";
@@ -44,7 +45,7 @@ export class LiveReportMarketDataProvider implements MarketDataProvider {
     private readonly stockProvider: Pick<
       MarketDataProvider,
       "getCoreStocks"
-    > = new FinMindMarketDataProvider(),
+    > = new OfficialEquityMarketProvider(),
   ) {}
 
   getGlobalMarkets() {
@@ -54,6 +55,52 @@ export class LiveReportMarketDataProvider implements MarketDataProvider {
   getCoreStocks() {
     return this.stockProvider.getCoreStocks();
   }
+}
+
+class CascadingRealtimeTaiwanProvider implements RealtimeTaiwanMarketProvider {
+  constructor(
+    private readonly providers: RealtimeTaiwanMarketProvider[],
+    private readonly searchProvider = new OfficialTaiwanMarketProvider(),
+  ) {}
+
+  search(query: string, limit?: number) {
+    return this.searchProvider.search(query, limit);
+  }
+
+  async getQuotes(symbols: string[]) {
+    const remaining = new Set(symbols);
+    const selected = new Map<string, LiveQuote>();
+    for (const provider of this.providers) {
+      if (remaining.size === 0) break;
+      const rows = await provider.getQuotes([...remaining]);
+      for (const row of rows) {
+        if (row.price === null || row.dataMode === "unavailable") continue;
+        selected.set(row.symbol, row);
+        remaining.delete(row.symbol);
+      }
+    }
+    return symbols.map(
+      (symbol) =>
+        selected.get(symbol) ??
+        unavailableQuote(
+          symbol,
+          "Fugle / Yahoo Finance / 臺灣官方行情",
+          `${symbol} 的正式行情來源目前皆 unavailable。`,
+          "PROVIDER_UNAVAILABLE",
+        ),
+    );
+  }
+}
+
+function createLiveRealtimeTaiwanProvider() {
+  const fallbackProviders: RealtimeTaiwanMarketProvider[] = [
+    new YahooTaiwanMarketProvider(),
+    new OfficialTaiwanMarketProvider(),
+  ];
+  const fugleKey = process.env.FUGLE_MARKETDATA_API_KEY;
+  if (fugleKey)
+    fallbackProviders.unshift(new FugleRealtimeTaiwanProvider(fugleKey));
+  return new CascadingRealtimeTaiwanProvider(fallbackProviders);
 }
 
 export class StaleAwareMarketDataProvider implements MarketDataProvider {
@@ -160,7 +207,12 @@ export function createReportMarketProvider(
     return new UnavailableMarketDataProvider(
       unavailableFromResolution(resolution),
     );
-  return new StaleAwareMarketDataProvider(new LiveReportMarketDataProvider());
+  return new StaleAwareMarketDataProvider(
+    new LiveReportMarketDataProvider(
+      new OfficialGlobalMarketProvider(),
+      new OfficialEquityMarketProvider(createLiveRealtimeTaiwanProvider()),
+    ),
+  );
 }
 
 export function createRealtimeTaiwanProvider(
@@ -171,17 +223,8 @@ export function createRealtimeTaiwanProvider(
     return new UnavailableRealtimeTaiwanProvider(
       resolution.warning ?? "此資料模式不提供即時行情。",
     );
-  const fugleKey = process.env.FUGLE_MARKETDATA_API_KEY;
-  if (fugleKey)
-    return new StaleAwareRealtimeTaiwanProvider(
-      new FugleRealtimeTaiwanProvider(fugleKey),
-    );
-  if (process.env.FINMIND_API_TOKEN)
-    return new StaleAwareRealtimeTaiwanProvider(
-      new FinMindDelayedTaiwanProvider(),
-    );
-  return new UnavailableRealtimeTaiwanProvider(
-    "未設定 FUGLE_MARKETDATA_API_KEY 或 FINMIND_API_TOKEN。",
+  return new StaleAwareRealtimeTaiwanProvider(
+    createLiveRealtimeTaiwanProvider(),
   );
 }
 
@@ -189,10 +232,9 @@ export function createTaiwanSearchProvider(
   resolution = resolveRuntimeDataMode(),
 ): RealtimeTaiwanMarketProvider {
   if (resolution.mode === "mock") return new MockRealtimeTaiwanProvider();
-  if (resolution.mode === "live" && process.env.FINMIND_API_TOKEN)
-    return new FinMindDelayedTaiwanProvider();
+  if (resolution.mode === "live") return new OfficialTaiwanMarketProvider();
   return new UnavailableRealtimeTaiwanProvider(
-    resolution.warning ?? "未設定 FINMIND_API_TOKEN，股票清單 unavailable。",
+    resolution.warning ?? "目前資料模式不提供正式股票清單。",
   );
 }
 
@@ -200,6 +242,7 @@ export type CandleSourceSelection =
   | { kind: "mock" }
   | { kind: "fugle"; apiKey: string }
   | { kind: "finmind" }
+  | { kind: "yahoo" }
   | {
       kind: "unavailable";
       errorCode: "NOT_CONFIGURED" | "PROVIDER_UNAVAILABLE";
@@ -224,23 +267,11 @@ export function selectCandleSource(
       errorCode: "PROVIDER_UNAVAILABLE",
       errorMessage: "Tick 尚未啟用合法串流與時序儲存層。",
     };
-  if (["1m", "5m", "15m", "30m", "60m"].includes(interval)) {
-    const apiKey = process.env.FUGLE_MARKETDATA_API_KEY;
-    return apiKey
-      ? { kind: "fugle", apiKey }
-      : {
-          kind: "unavailable",
-          errorCode: "NOT_CONFIGURED",
-          errorMessage: "未設定 FUGLE_MARKETDATA_API_KEY，分鐘 K unavailable。",
-        };
-  }
-  return process.env.FINMIND_API_TOKEN
-    ? { kind: "finmind" }
-    : {
-        kind: "unavailable",
-        errorCode: "NOT_CONFIGURED",
-        errorMessage: "未設定 FINMIND_API_TOKEN，日 K unavailable。",
-      };
+  const apiKey = process.env.FUGLE_MARKETDATA_API_KEY;
+  if (apiKey) return { kind: "fugle", apiKey };
+  if (["1d", "1w", "1mo"].includes(interval) && process.env.FINMIND_API_TOKEN)
+    return { kind: "finmind" };
+  return { kind: "yahoo" };
 }
 
 export function resetProviderCachesForTests() {

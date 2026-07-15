@@ -11,6 +11,17 @@ const n = (value: number | null) =>
         value,
       );
 
+const percent = (value: number | null) =>
+  value === null ? "—" : `${n(value)}%`;
+
+const compact = (value: number | null) =>
+  value === null
+    ? "—"
+    : new Intl.NumberFormat("zh-TW", {
+        notation: "compact",
+        maximumFractionDigits: 2,
+      }).format(value);
+
 export function ReportView({ report }: { report: DailyReport }) {
   const definition = REPORT_DEFINITIONS[report.reportType];
   return (
@@ -53,8 +64,8 @@ export function ReportView({ report }: { report: DailyReport }) {
       {report.dataMode === "unavailable" && (
         <div className="notice">
           正式站已停用 Mock
-          補值；缺少合法資料來源的欄位會保持空白。可用的台股資料仍標示 Fugle 或
-          FinMind 來源。
+          補值；缺少合法資料來源的欄位會保持空白。可用資料會標示 Fugle、Yahoo
+          Finance、臺灣證券交易所、櫃買中心或其他實際來源。
         </div>
       )}
       {report.dataMode === "stale" && (
@@ -212,6 +223,76 @@ export function ReportView({ report }: { report: DailyReport }) {
             </tbody>
           </table>
         </div>
+      </section>
+      <section className="card section">
+        <h2>核心股票正式基本面</h2>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>股票／來源</th>
+                <th>最新 EPS</th>
+                <th>營收年增</th>
+                <th>EPS 年增</th>
+                <th>毛利率／趨勢</th>
+                <th>自由現金流／年增</th>
+                <th>目前本益比</th>
+                <th>預估本益比</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.stocks.map((stock) => {
+                const values = stock.fundamentals?.value;
+                return (
+                  <tr key={`fundamental-${stock.symbol}`}>
+                    <td>
+                      <strong>{stock.name}</strong>
+                      <div>{stock.symbol}</div>
+                      {stock.fundamentals && (
+                        <DataProvenance
+                          dataMode={stock.fundamentals.dataMode}
+                          errorCode={stock.fundamentals.errorCode}
+                          errorMessage={stock.fundamentals.errorMessage}
+                          fetchedAt={stock.fundamentals.fetchedAt}
+                          isDelayed={stock.fundamentals.isDelayed}
+                          lastSuccessfulFetchAt={
+                            stock.fundamentals.lastSuccessfulFetchAt
+                          }
+                          marketDate={stock.fundamentals.marketDate}
+                          sourceName={stock.fundamentals.sourceName}
+                        />
+                      )}
+                    </td>
+                    <td>{n(values?.eps ?? null)}</td>
+                    <td>{percent(values?.revenueGrowth ?? null)}</td>
+                    <td>{percent(values?.epsGrowth ?? null)}</td>
+                    <td>
+                      {percent(values?.grossMargin ?? null)}／
+                      {values?.grossMarginTrend === null ||
+                      values?.grossMarginTrend === undefined
+                        ? "—"
+                        : `${n(values.grossMarginTrend)} 個百分點`}
+                    </td>
+                    <td>
+                      {compact(values?.freeCashFlow ?? null)}／
+                      {percent(values?.freeCashFlowTrend ?? null)}
+                    </td>
+                    <td>{n(values?.trailingPe ?? null)}</td>
+                    <td>
+                      {values?.forwardPe === null ||
+                      values?.forwardPe === undefined
+                        ? "需授權分析師預估資料"
+                        : n(values.forwardPe)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="source">
+          「目前本益比」與「預估本益比」資料意義不同；沒有分析師一致預期授權時，不用目前本益比冒充預估值。
+        </p>
       </section>
       <section className="grid grid-2 section">
         <div className="card">
