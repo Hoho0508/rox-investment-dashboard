@@ -1,7 +1,9 @@
-import { subYears } from "date-fns";
+import { subDays, subYears } from "date-fns";
 import { z } from "zod";
+import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
+import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
 import { taipeiDate } from "@/lib/reports/calendar";
-import type { PriceCandle, TaiwanSecurity } from "@/types/market";
+import type { LiveQuote, PriceCandle, TaiwanSecurity } from "@/types/market";
 
 const DATA_URL = "https://api.finmindtrade.com/api/v4/data";
 const infoSchema = z.object({
@@ -96,4 +98,99 @@ export async function fetchFinMindCandles(
     }))
     .sort((a, b) => a.time.localeCompare(b.time))
     .slice(-limit);
+}
+
+const delayedQuoteCache = new Map<
+  string,
+  { expiresAt: number; quote: LiveQuote }
+>();
+
+async function fetchRecentCandles(symbol: string) {
+  const url = new URL(DATA_URL);
+  url.searchParams.set("dataset", "TaiwanStockPrice");
+  url.searchParams.set("data_id", symbol);
+  url.searchParams.set("start_date", taipeiDate(subDays(new Date(), 30)));
+  url.searchParams.set("end_date", taipeiDate());
+  const response = await fetch(url, {
+    headers: authHeaders(),
+    signal: AbortSignal.timeout(6_000),
+    cache: "no-store",
+  });
+  if (!response.ok)
+    throw new Error(`FinMind 最新收盤價 HTTP ${response.status}`);
+  const parsed = priceSchema.parse(await response.json());
+  return parsed.data.sort((a, b) => a.date.localeCompare(b.date)).slice(-2);
+}
+
+export class FinMindDelayedTaiwanProvider implements RealtimeTaiwanMarketProvider {
+  private readonly fallback = new MockRealtimeTaiwanProvider();
+
+  async search(query: string, limit = 20) {
+    try {
+      return await searchFinMindSecurities(query, limit);
+    } catch {
+      return this.fallback.search(query, limit);
+    }
+  }
+
+  async getQuotes(symbols: string[]): Promise<LiveQuote[]> {
+    const fallback = await this.fallback.getQuotes(symbols);
+    return Promise.all(
+      symbols.map(async (symbol, index) => {
+        const cached = delayedQuoteCache.get(symbol);
+        if (cached && cached.expiresAt > Date.now()) return cached.quote;
+        try {
+          const [securityRows, prices] = await Promise.all([
+            searchFinMindSecurities(symbol, 10),
+            fetchRecentCandles(symbol),
+          ]);
+          const latest = prices.at(-1);
+          const previous = prices.at(-2);
+          if (!latest) throw new Error("查無最近交易資料");
+          const security = securityRows.find((item) => item.symbol === symbol);
+          const previousClose = previous?.close ?? latest.close;
+          const change = latest.close - previousClose;
+          const quote: LiveQuote = {
+            symbol,
+            name: security?.name ?? fallback[index].name,
+            exchange: security?.exchange ?? fallback[index].exchange,
+            market: "TW",
+            price: latest.close,
+            previousClose,
+            open: latest.open,
+            high: latest.max,
+            low: latest.min,
+            change,
+            changePercent:
+              previousClose === 0 ? 0 : (change / previousClose) * 100,
+            volume: latest.Trading_Volume,
+            asOf: `${latest.date}T13:30:00+08:00`,
+            sourceName: "FinMind / TaiwanStockPrice",
+            sourceUrl: DATA_URL,
+            dataMode: "live",
+            isDelayed: true,
+            status: "delayed",
+          };
+          delayedQuoteCache.set(symbol, {
+            expiresAt: Date.now() + 300_000,
+            quote,
+          });
+          return quote;
+        } catch (error) {
+          return {
+            ...fallback[index],
+            error: `FinMind 最新收盤價取得失敗：${error instanceof Error ? error.message : "未知錯誤"}`,
+          };
+        }
+      }),
+    );
+  }
+
+  async getCandles(symbol: string, limit = 320) {
+    try {
+      return await fetchFinMindCandles(symbol, limit);
+    } catch {
+      return this.fallback.getCandles(symbol, limit);
+    }
+  }
 }

@@ -1,11 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   analyzeMarketHistory,
   findSimilarMarketPeriods,
 } from "@/lib/analysis/market-patterns";
+import { FinMindDelayedTaiwanProvider } from "@/lib/market/finmind-market";
 import { MockRealtimeTaiwanProvider, mockCandles } from "@/lib/market/mock";
 
 describe("歷史市場分析", () => {
+  afterEach(() => vi.unstubAllGlobals());
   it("以足夠歷史資料產生透明判斷與相似情境", () => {
     const candles = mockCandles("2330", 320);
     const analysis = analyzeMarketHistory("2330", candles);
@@ -31,5 +33,54 @@ describe("歷史市場分析", () => {
     expect(quote.dataMode).toBe("mock");
     expect(quote.sourceName).toContain("模擬");
     expect(quote.error).toContain("尚未設定");
+  });
+
+  it("沒有盤中金鑰時以 FinMind 最新收盤價取代錯誤 Mock 價格", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: URL | RequestInfo) => {
+        const url = new URL(String(input));
+        if (url.searchParams.get("dataset") === "TaiwanStockInfo")
+          return Response.json({
+            status: 200,
+            data: [
+              {
+                stock_id: "2330",
+                stock_name: "台積電",
+                type: "twse",
+              },
+            ],
+          });
+        return Response.json({
+          status: 200,
+          data: [
+            {
+              date: "2026-07-13",
+              open: 1000,
+              max: 1030,
+              min: 990,
+              close: 1010,
+              Trading_Volume: 10_000,
+            },
+            {
+              date: "2026-07-14",
+              open: 1020,
+              max: 1040,
+              min: 1010,
+              close: 1030,
+              Trading_Volume: 12_000,
+            },
+          ],
+        });
+      }),
+    );
+    const [quote] = await new FinMindDelayedTaiwanProvider().getQuotes([
+      "2330",
+    ]);
+    expect(quote.price).toBe(1030);
+    expect(quote.previousClose).toBe(1010);
+    expect(quote.dataMode).toBe("live");
+    expect(quote.isDelayed).toBe(true);
+    expect(quote.sourceName).toContain("FinMind");
   });
 });

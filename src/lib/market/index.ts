@@ -1,4 +1,5 @@
 import {
+  FinMindDelayedTaiwanProvider,
   fetchFinMindCandles,
   searchFinMindSecurities,
 } from "@/lib/market/finmind-market";
@@ -6,10 +7,11 @@ import { FugleRealtimeTaiwanProvider } from "@/lib/market/fugle";
 import { MockRealtimeTaiwanProvider } from "@/lib/market/mock";
 
 const mock = new MockRealtimeTaiwanProvider();
+const finMindDelayed = new FinMindDelayedTaiwanProvider();
 
 export function getRealtimeTaiwanProvider() {
   const key = process.env.FUGLE_MARKETDATA_API_KEY;
-  return key ? new FugleRealtimeTaiwanProvider(key) : mock;
+  return key ? new FugleRealtimeTaiwanProvider(key) : finMindDelayed;
 }
 
 export async function searchTaiwanSecurities(query: string, limit = 20) {

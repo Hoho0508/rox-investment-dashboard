@@ -118,7 +118,7 @@ REPORT_MAX_RETRIES=2
 
 台股日成交價由 `src/lib/providers/finmind.ts` 與 `src/lib/market/finmind-market.ts` 透過 FinMind 取得。Token 只讀取 server-side 的 `process.env.FINMIND_API_TOKEN`；沒有 Token、逾時、額度不足、HTTP 錯誤、空資料或格式異常時，自動切換 Mock，並在 `error` 與資料狀態中標示原因。FinMind 日資料為盤後更新且標示延遲，不冒充盤中即時行情。
 
-盤中即時台股由 `src/lib/market/fugle.ts` 透過 Fugle Intraday Quote 取得，金鑰只讀取 `process.env.FUGLE_MARKETDATA_API_KEY`。前端永遠只呼叫本站受登入保護的 API route，不會接觸供應商金鑰。行情每 15 至 30 秒更新一次並提供手動更新；自選清單保存於 PostgreSQL。沒有 Fugle Key 時顯示清楚標示的 Mock，不假裝即時。
+盤中即時台股由 `src/lib/market/fugle.ts` 透過 Fugle Intraday Quote 取得，金鑰只讀取 `process.env.FUGLE_MARKETDATA_API_KEY`。前端永遠只呼叫本站受登入保護的 API route，不會接觸供應商金鑰。行情每 15 至 30 秒更新一次並提供手動更新；自選清單保存於 PostgreSQL。沒有 Fugle Key 時改顯示 FinMind 最新交易日收盤價並標示「延遲行情」；只有 FinMind 也失敗時才顯示 Mock。
 
 Live 串接建議優先評估 TWSE／MOPS 公開資料、公司 IR、SEC、BLS、Federal Reserve／FRED，以及具有明確授權條款的市場與新聞 API。可能需要申請市場資料與新聞 API Key；Key 僅能設於 server-side 環境變數。更換供應商時實作 `src/lib/providers/contracts.ts` 介面，並保留來源、資料日期、擷取時間、延遲狀態、信心與結構化錯誤。
 
