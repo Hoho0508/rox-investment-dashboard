@@ -1,13 +1,10 @@
-export const DATA_MODES = [
-  "live",
-  "delayed",
-  "stale",
-  "manual",
-  "mock",
-  "unavailable",
-] as const;
+import {
+  DATA_MODES,
+  type DataMode as CanonicalDataMode,
+} from "@/lib/config/data-mode";
 
-export type DataMode = (typeof DATA_MODES)[number];
+export { DATA_MODES };
+export type DataMode = CanonicalDataMode;
 export type Level = "低" | "中" | "高" | "未知";
 
 export type DataEnvelope<T> = {

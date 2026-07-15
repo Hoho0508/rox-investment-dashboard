@@ -1,6 +1,24 @@
 import { z } from "zod";
 
-export const requestedDataModeSchema = z.enum(["live", "manual", "mock"]);
+export const DATA_MODES = [
+  "live",
+  "delayed",
+  "stale",
+  "manual",
+  "mock",
+  "unavailable",
+] as const;
+
+export const dataModeSchema = z.enum(DATA_MODES);
+export type DataMode = z.infer<typeof dataModeSchema>;
+
+const REQUESTED_DATA_MODES = [
+  "live",
+  "manual",
+  "mock",
+] as const satisfies readonly DataMode[];
+
+export const requestedDataModeSchema = z.enum(REQUESTED_DATA_MODES);
 
 export type RequestedDataMode = z.infer<typeof requestedDataModeSchema>;
 export type RuntimeDataMode = RequestedDataMode | "unavailable";
