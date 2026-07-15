@@ -92,3 +92,31 @@ test("股票獨立頁預設顯示 1 分鐘 K 與可解釋技術評分", async ({
   await expect(page.getByRole("heading", { name: "技術面判斷" })).toBeVisible();
   await expect(page.getByText("失效條件：", { exact: false })).toBeVisible();
 });
+
+test("新手研究中心顯示法說狀態、白話判斷與四個股票倉庫", async ({ page }) => {
+  await login(page);
+  await page.getByRole("link", { name: "新手研究中心" }).click();
+  await expect(
+    page.getByRole("heading", { name: "新手研究中心" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "近期法說雷達" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "新手快速判斷" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "主題股票倉庫" }),
+  ).toBeVisible();
+  for (const category of [
+    "記憶體（10）",
+    "AI（10）",
+    "IC 晶片（10）",
+    "權值股（10）",
+  ])
+    await expect(page.getByText(category, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("2408 南亞科")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "加入已選 0 檔" }),
+  ).toBeDisabled();
+});

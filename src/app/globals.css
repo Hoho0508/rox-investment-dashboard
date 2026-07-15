@@ -298,6 +298,196 @@ th {
   border-radius: 8px;
   line-height: 1.55;
 }
+.section-heading,
+.beginner-title,
+.save-library-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.section-heading {
+  margin-bottom: 14px;
+}
+.section-heading h2 {
+  margin-bottom: 0;
+}
+.data-mode {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.mode-delayed,
+.mode-stale {
+  color: #d97706;
+}
+.mode-unavailable,
+.mode-mock {
+  color: #dc2626;
+}
+.event-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.event-card {
+  display: grid;
+  gap: 9px;
+}
+.event-card h3,
+.event-card p,
+.event-card small,
+.beginner-card h3,
+.beginner-card p,
+.beginner-card ul,
+.glossary-grid h3,
+.glossary-grid p {
+  margin: 0;
+}
+.event-date {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.event-date strong {
+  color: var(--brand);
+}
+.event-card p,
+.beginner-card p,
+.glossary-grid p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.beginner-card {
+  display: grid;
+  gap: 12px;
+}
+.beginner-title {
+  justify-content: flex-start;
+}
+.beginner-title span {
+  color: var(--brand);
+  font-weight: 800;
+}
+.beginner-card h4 {
+  margin: 3px 0 -5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.beginner-card ul {
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.beginner-法說前先觀察,
+.beginner-等待確認 {
+  background: color-mix(in srgb, #d97706 14%, var(--surface));
+  color: #d97706;
+}
+.beginner-適合開始研究 {
+  background: color-mix(in srgb, #16a34a 14%, var(--surface));
+  color: #16a34a;
+}
+.beginner-風險較高,
+.beginner-資料不足 {
+  background: color-mix(in srgb, #dc2626 14%, var(--surface));
+  color: #dc2626;
+}
+.risk-box {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--surface2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.risk-box strong {
+  color: var(--muted);
+}
+.library-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+.library-card {
+  padding-top: 10px;
+}
+.library-card legend {
+  padding: 0 8px;
+  color: var(--brand);
+  font-weight: 800;
+}
+.library-card > p {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.library-stocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.library-stocks label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.library-stocks label.saved {
+  background: color-mix(in srgb, var(--brand) 9%, var(--surface));
+}
+.library-stocks input {
+  width: auto;
+  margin: 0;
+}
+.library-stocks small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.save-library-bar {
+  justify-content: flex-start;
+  position: sticky;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 4;
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  backdrop-filter: blur(12px);
+}
+.save-library-bar span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.save-library-bar a {
+  margin-left: auto;
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+}
+.secondary-button {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.glossary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
 .market-workspace {
   display: grid;
   gap: 18px;
@@ -824,6 +1014,10 @@ form input[type="checkbox"] {
   .indicator-table {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+  .event-list,
+  .glossary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 720px) {
   .shell {
@@ -909,5 +1103,21 @@ form input[type="checkbox"] {
   }
   .report-tabs a {
     padding: 10px;
+  }
+  .event-list,
+  .library-grid,
+  .glossary-grid {
+    grid-template-columns: 1fr;
+  }
+  .library-stocks {
+    grid-template-columns: 1fr;
+  }
+  .save-library-bar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+  .save-library-bar a {
+    width: 100%;
+    margin-left: 0;
   }
 }

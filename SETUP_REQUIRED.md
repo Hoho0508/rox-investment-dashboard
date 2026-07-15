@@ -40,6 +40,7 @@
 
 ## 不需要現在處理
 
+- 公開資訊觀測站法人說明會一覽表不需要帳號、Token 或付費設定；部署環境只需允許 outbound HTTPS。來源暫時失敗時會顯示 unavailable，不會用模擬事件補值。
 - TWSE OpenAPI 與 U.S. Treasury XML Feed 不需要帳號、Token 或付費設定；部署環境只需允許正常的 outbound HTTPS。
 - Yahoo Finance Chart 與 fundamentals、TWSE／TPEx OpenAPI、U.S. Treasury Feed 不需要新增帳號或 Token；部署環境只需允許 outbound HTTPS。
 - 美股逐筆即時行情、分析師一致預期、新聞與法人籌碼 Provider 尚未選定，不需要註冊新服務。

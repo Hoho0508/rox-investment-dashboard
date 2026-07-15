@@ -4,6 +4,14 @@
 
 ## Unreleased
 
+### Beginner Research Center
+
+- 新增近期法說雷達，從公開資訊觀測站讀取上市與上櫃法人說明會，標示日期、來源、抓取時間與部分／完全 unavailable 狀態；Mock 模式不產生假事件。
+- 新增新手白話判斷，沿用既有進場分數與正式基本面，輸出支持證據、反對證據、最大風險、失效條件與信心；法說前兩天優先提示先觀察。
+- 新增營收、EPS、自由現金流、本益比、RSI 與成交量的白話字典。
+- 新增記憶體、AI、IC 晶片、權值股四個研究倉庫，每類固定 10 檔；登入使用者可批次儲存到現有 PostgreSQL 自選股。
+- 新增股票倉庫白名單驗證、MOPS parser、事件失敗安全行為與新手判斷測試。
+
 ### Production Equity Data and Responsiveness
 
 - 晨報、午盤與盤後核心股票不再以 FinMind Token 為必要條件；Live Factory 依序使用 Fugle、Yahoo Finance Chart 與 TWSE／TPEx 正式行情，全部失敗才回 stale 或 unavailable。

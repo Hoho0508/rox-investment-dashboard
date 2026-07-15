@@ -43,3 +43,7 @@ export const watchlistItemSchema = z.object({
   name: z.string().trim().min(1).max(80),
   exchange: z.enum(["TWSE", "TPEx", "ESB", "UNKNOWN"]).optional(),
 });
+
+export const watchlistLibrarySchema = z.object({
+  symbols: z.array(taiwanSymbolSchema).min(1).max(40),
+});

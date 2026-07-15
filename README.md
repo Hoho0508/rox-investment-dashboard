@@ -9,6 +9,8 @@ V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)；Phase 1 核心稽核見 [`CODE
 - 每天台灣時間 09:00 產生晨報，交易日 12:30 產生午盤報告、15:00 產生盤後報告
 - 可安裝至 iPhone／Android 主畫面的 PWA 手機 App
 - 首頁、每日晨報、歷史報告、核心股票、進出場評分、投資日誌、資料狀態與設定頁
+- 新手研究中心：公開資訊觀測站法說雷達、白話證據判斷與數據字典
+- 記憶體、AI、IC 晶片、權值股四個研究倉庫，每類 10 檔並可批次存入私人自選股
 - Mock／Manual／Live 三種 runtime 選擇，以及 LIVE／DELAYED／STALE／MANUAL／MOCK／UNAVAILABLE 六種資料狀態
 - 台灣時區與週末休市版晨報
 - 同一交易日同類報告唯一索引與應用層去重
@@ -39,6 +41,8 @@ src/lib/market/      台股清單、盤中行情、K 線與自選清單
 src/lib/analysis/    歷史相似情境與透明進場分析
 src/lib/technical/   純函式技術指標、評分、位置與型態分析
 src/lib/intelligence/ 市場脈動與後續 AI 情報聚合
+src/lib/events/      法說會等可追溯的公司事件資料
+src/lib/research/    新手判斷、白話解釋與股票研究清單
 src/lib/reports/     時區、生成、儲存與排程工作
 src/lib/scoring/     進場與出場規則
 src/lib/validation/  Zod 輸入驗證
@@ -143,6 +147,10 @@ REPORT_MAX_RETRIES=2
 Runtime 選擇集中在 `src/lib/config/data-mode.ts` 與 `src/lib/providers/provider-factory.ts`。Provider 本身不得選 Mock fallback。development 未設定 `DATA_MODE` 時可預設 Mock；Production 未設定或值無效時會 fail closed 為 unavailable，絕不預設 Mock。
 
 Mock provider 僅供本機開發與自動測試。正式環境 `DATA_MODE=live` 時，報告、市場脈動、即時報價與 K 線都禁止用 Mock 補值；這能避免網站中斷，但缺少正式來源的欄位會保持空白。
+
+新手研究中心的近期法說會讀取公開資訊觀測站法人說明會一覽表，採 30 分鐘快取並標示官方來源、活動日期與抓取時間。官方來源失敗時顯示 unavailable；`DATA_MODE=mock` 不製造模擬法說日期。法說前兩天會降低判斷信心並優先提示先觀察，因公司展望可能改變既有結論。
+
+四個股票倉庫是固定的研究代表清單，不是即時市值、漲幅排名或推薦。送出時伺服器會重新以可信任清單解析代碼，再批次 upsert 到既有 PostgreSQL `WatchlistItem`，不接受前端自行指定公司名稱或交易所。
 
 Live 報告的正式跨市場輸入使用臺灣證券交易所 OpenAPI 的 TAIEX、臺灣 50、臺灣資訊科技指數，以及美國財政部 XML Feed 的 2 年／10 年公債殖利率。核心股票價格依序使用已授權的 Fugle、Yahoo Finance Chart、TWSE／TPEx 收盤資料；NVDA 使用 Yahoo Finance Chart。這些公開來源保守標示 DELAYED、來源日期與擷取時間。關鍵輸入缺漏時，市場方向、模型信心與情境機率會降低或顯示資料不足，不用固定敘事補值。
 

@@ -6,6 +6,7 @@ const links = [
   ["/reports", "每日報告"],
   ["/history", "歷史報告"],
   ["/stocks", "即時台股與 K 線"],
+  ["/research", "新手研究中心"],
   ["/scoring", "進出場評分"],
   ["/journal", "投資日誌"],
   ["/data-status", "資料狀態"],

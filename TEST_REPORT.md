@@ -2,6 +2,21 @@
 
 執行日期：2026-07-15。
 
+## 新手研究中心
+
+| Command             | Result | Evidence                                                            |
+| ------------------- | ------ | ------------------------------------------------------------------- |
+| `pnpm format:check` | PASS   | Prettier 全部符合。                                                 |
+| `pnpm lint`         | PASS   | ESLint 0 warnings。                                                 |
+| `pnpm typecheck`    | PASS   | TypeScript noEmit 通過。                                            |
+| `pnpm test`         | PASS   | 12 files、65 tests。                                                |
+| `pnpm test:e2e`     | PASS   | Desktop Chrome + iPhone 13，共 18 tests。                           |
+| `pnpm build`        | PASS   | Next.js 16.2.10，新增 `/research` 與批次 watchlist API 完成 build。 |
+
+新增測試涵蓋 MOPS 民國日期與法說摘要解析、官方來源失敗不產生 Mock 事件、Mock 模式不捏造法說日期、法說前兩天降低判斷信心、正向證據只提示開始研究，以及四個股票倉庫各 10 檔與伺服器白名單解析。第一次單元測試發現白話摘要仍含「買進訊號」字樣；改為完全不使用買賣措辭後重新執行，65/65 通過。
+
+另以 `DATA_MODE=live` 執行不含密鑰的官方來源 smoke test：MOPS 回傳 `delayed`，2026-07-15 起未來 7 天共解析 16 筆法人說明會資料。這只驗證當次官方連線與 parser；公司仍可能新增或變更公告，UI 會要求回官方來源確認。
+
 ## Production 正式股票資料與互動回饋
 
 | Command             | Result | Evidence                                                        |

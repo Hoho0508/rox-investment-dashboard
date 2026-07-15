@@ -93,3 +93,16 @@
 - **跳過的項目：** 未建立帳號、未修改或輸出 Token、未購買服務、未繞過 Goodinfo 驗證、未改評分權重、未自動下單。
 - **需要核准的事項：** 未來若要逐筆即時美股或預估本益比，需另行核准有再散布與分析師預估授權的 Provider。
 - **下一輪建議：** 完成本次已明確授權的 Production 部署與三時段線上驗證後停止；下一輪優先處理跨 instance cache 與 API rate limit。
+
+## Run 005 — 新手研究中心
+
+- **開始時間：** 2026-07-15 19:50 Asia/Taipei
+- **檢查結果：** 既有系統已有正式行情、基本面、進場評分與 PostgreSQL 自選股，但缺少近期公司事件入口、適合初學者的白話證據摘要，以及可直接挑選的主題研究清單。
+- **選擇的工作：** 只完成一個整合模組：MOPS 近期法說雷達、新手快速判斷、數據白話字典，以及記憶體／AI／IC 晶片／權值股各 10 檔股票倉庫與批次自選儲存。
+- **修改檔案：** 新增 `src/lib/events/`、`src/lib/research/`、`src/types/research.ts`、`src/app/research/`、`src/components/research-center.tsx`、`src/app/api/watchlist/library/` 與 `tests/unit/research.test.ts`；調整 Sidebar、validation、CSS、E2E 與專案文件。
+- **執行命令：** `pnpm format`、`pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm test:e2e`、`pnpm build`、MOPS Live smoke test、`git diff --check`。
+- **測試結果：** Prettier、ESLint、TypeScript 通過；Vitest 12 files／65 tests；Playwright 桌面與 iPhone 13 共 18 tests；Next.js production build 通過；MOPS Live smoke test 成功解析未來 7 天 16 筆事件。
+- **發現的風險：** MOPS HTML 結構若變更，parser 會 fail closed 為 unavailable；固定股票倉庫不是即時排名，需定期由維護者檢查代表性；法說公告可能臨時更動，不能取代官方頁面確認。
+- **跳過的項目：** 未修改評分權重、未新增付費服務或 Token、未改資料庫 schema、未部署 Production、未建立買賣訊號。
+- **需要核准的事項：** 無；MOPS 官方公開頁不需登入。若未來要推播法說提醒或建立完整歷史事件時間軸，應另案評估通知權限與資料保存。
+- **下一輪建議：** 先由使用者驗收新手研究中心；下一個獨立模組可做股票倉庫自訂標籤或個股完整事件時間軸，二選一。
