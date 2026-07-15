@@ -2,6 +2,16 @@
 
 V2 的目標是建立可驗證、可解釋、可回測的 AI 投資研究平台。所有功能皆遵守：資料來源透明、Mock 不冒充正式資料、分析必須列出支持／反對證據、最大風險、失效條件與信心程度；系統不自動下單，也不保證獲利。
 
+## Core Foundation Refactor（優先於新功能）
+
+- [x] Phase 1：完整資料流、秘密、Provider、技術分析、評分、DB、Cron 與測試稽核
+- [ ] Phase 2：六態 DataMode、production fail-closed、移除隱性 Mock fallback
+- [ ] Phase 3：Provider factory、結構化錯誤、stale cache、限流與請求合併
+- [ ] Phase 4：技術指標與進出場評分模組化、provenance gate 與 golden tests
+- [ ] Phase 5：安全 Data Status API、DB 契約、完整測試與 build
+
+詳細順序與驗收見 [`REFACTOR_PLAN.md`](./REFACTOR_PLAN.md)。完成 Core Foundation P0～P2 前，不開始市場輪動、新聞時間軸、策略回測或新的 AI 功能。
+
 ## Phase 1：技術分析中心與分鐘 K（進行中）
 
 - [x] 每檔股票獨立網址與技術分析工作區

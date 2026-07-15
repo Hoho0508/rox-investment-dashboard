@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+### Audited
+
+- 完成核心資料層、Provider、Live/Mock、技術分析、評分、快取、資料庫、Cron、測試與部署設定的 Phase 1 稽核。
+- 新增 `CODE_AUDIT.md`、`DATA_AUDIT.md`、`SECURITY_AUDIT.md`、`REFACTOR_PLAN.md`、`DATA_STATUS_REPORT.md` 與 `TEST_REPORT.md`。
+- 記錄 27 項待辦（P0 1、P1 10、P2 13、P3 3）；本階段沒有修改應用程式行為或正式環境。
+
 ### Fixed
 
 - 晨報缺少正式全球市場輸入時，不再顯示固定的市場方向、波動、信心、情境百分比或未經資料支持的風險敘事。

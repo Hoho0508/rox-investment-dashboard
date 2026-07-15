@@ -1,0 +1,134 @@
+# Core Data and Technical Refactor Plan
+
+本計畫依附件要求分階段執行。本次只完成 Phase 1 稽核；Phase 2 之後尚未開始。
+
+## 原則
+
+- 不重寫專案，不改 UI 主題，不刪正式資料。
+- 先加 compatibility adapter 與測試，再逐條切換呼叫端。
+- 每個 phase 一個窄範圍 commit，通過 check/build；使用者可見變更再跑 E2E。
+- Live 不回 Mock；Mock 不碰 Live；Manual 不被固定數值補齊。
+- 所有分析先驗證 lineage，再計算分數。
+
+## Phase 2：修復模式與 fallback（下一階段）
+
+### 2.1 集中 runtime mode
+
+- 新增 `src/lib/config/data-mode.ts`。
+- Zod 驗證 `DATA_MODE` 與 production fail-closed 規則。
+- 提供 `getRuntimeDataMode()`、`isProductionRuntime()`，移除散落的直接判斷。
+- 建立六態 DataMode、DataEnvelope 與舊 DataPoint compatibility adapter。
+
+### 2.2 移除隱性 fallback
+
+- Provider factory 依模式選 provider，不由 provider 捕捉後改走 Mock。
+- live failure 僅回 stale（有快取）或 unavailable。
+- mock 模式即使存在 key 也不呼叫 Live API。
+- 拆除 Live stock 上的 Mock fundamental/risk/event template。
+
+### 2.3 分析/評分閘門
+
+- Live 模式拒絕 Mock K 線進技術/歷史評分。
+- ScoreResult 增加 validity、dataMode、missingInputs。
+- 報告 UI 對 invalid 顯示資料不足，不顯示數字分數。
+
+### 2.4 測試
+
+- production missing/invalid mode、mock with key、FinMind/Fugle failure、mixed snapshot、Mock analysis rejection、scenario 100%。
+
+**Phase 2 驗收：** 全 repo 模式判斷集中；live 路徑 0 個 Mock fallback；舊頁面可運作；`pnpm check`、E2E、build 通過。
+
+## Phase 3：Provider、錯誤與快取
+
+建議先建立新目錄並用 adapter 漸進遷移：
+
+```text
+src/lib/providers/
+  contracts.ts
+  provider-factory.ts
+  errors.ts
+  cache.ts
+  finmind/client.ts
+  finmind/quotes.ts
+  finmind/candles.ts
+  fugle/client.ts
+  fugle/quotes.ts
+  fugle/candles.ts
+  mock/quotes.ts
+  mock/candles.ts
+  unavailable/index.ts
+```
+
+- 共用 HTTP client：timeout、invalid JSON、status、429、empty、semantic date/OHLC validation、error sanitization。
+- Cache policy：quote short、daily candle medium、fundamental long；request coalescing 與 stale-if-error。
+- 前端 polling：visibility、market hours、AbortController、exponential backoff、Retry-After。
+- 登入、報價與手動產報 rate limit。
+
+**Phase 3 驗收：** 每類 dataset 只有一個選擇路徑；重複 K 線請求合併；錯誤皆有 errorCode；stale 顯示 last success。
+
+## Phase 4：技術分析與評分
+
+```text
+src/lib/technical/
+  types.ts
+  sma.ts
+  ema.ts
+  rsi.ts
+  macd.ts
+  kd.ts
+  atr.ts
+  bollinger.ts
+  volume.ts
+  support-resistance.ts
+  trend.ts
+  analyze.ts
+  index.ts
+
+src/lib/scoring/
+  config.ts
+  types.ts
+  fundamental.ts
+  valuation.ts
+  technical.ts
+  institutional.ts
+  risk.ts
+  entry.ts
+  exit.ts
+  index.ts
+```
+
+- 每個指標為 deterministic pure function，回 value + warm-up/availability。
+- 明訂 RSI/ATR/KD/VWAP 公式及 anchor，拒絕 NaN/Infinity/zero invalid input。
+- 用固定 OHLCV fixture 與獨立計算結果做 golden tests。
+- 型態辨識獨立測試；歷史相似樣本採不重疊與 embargo。
+- 所有評分權重集中；缺資料與混合來源先決定 validity，再談 score。
+
+**Phase 4 驗收：** 指標公式 fixture 通過；Mock 不產生正式評分；單一指標不能產生進出場結論；輸出含支持、反對、風險、失效條件。
+
+## Phase 5：Data Status、DB 與完整驗證
+
+- 建立登入保護 `/api/data-status` 與 dataset status registry。
+- 顯示 11 類資料的 mode/provider/date/fetch/last success/delay/error/cache。
+- StoredReport schema version + Zod read validation；DB error 與 preview 分開。
+- 評估 Decimal/enum migration，先備份與 dry-run。
+- 官方交易日曆、job deadline/lock。
+- 全站安全 headers、Origin 驗證與 CI。
+- 執行 check、所有 E2E、production build、production audit；只更新文件，不部署。
+
+**Phase 5 驗收：** 附件列出的 16 項測試全部有證據；Data Status 不含秘密；migration 有回滾說明；使用者核准後才安排 production。
+
+## Commit 建議
+
+1. `docs: audit core data architecture`（本 Phase 1）
+2. `refactor: enforce strict runtime data modes`
+3. `refactor: centralize market provider selection`
+4. `refactor: add provider errors cache and rate limits`
+5. `refactor: validate technical analysis provenance`
+6. `refactor: modularize indicators and scoring`
+7. `feat: expose safe data status diagnostics`
+
+## 回滾策略
+
+- 每 phase 保留舊介面 adapter，直到新介面測試與呼叫端全部切換。
+- DB 變更獨立 phase、先備份與 shadow/dry-run；不在 Provider 重構 commit 混入 migration。
+- 不以大量 rename 同時改行為；每個 commit 可單獨 revert。

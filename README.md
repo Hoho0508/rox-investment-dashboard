@@ -1,6 +1,6 @@
 # Rox Investment Dashboard
 
-V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)；需要專案擁有者親自完成的外部設定集中在 [`SETUP_REQUIRED.md`](./SETUP_REQUIRED.md)。每輪自主巡查記錄於 [`AUTONOMOUS_RUN_LOG.md`](./AUTONOMOUS_RUN_LOG.md)，顯著變更與待核准構想分別記錄於 [`CHANGELOG.md`](./CHANGELOG.md) 與 [`PROPOSALS.md`](./PROPOSALS.md)。
+V2 開發進度見 [`ROADMAP.md`](./ROADMAP.md)；Phase 1 核心稽核見 [`CODE_AUDIT.md`](./CODE_AUDIT.md)、[`DATA_AUDIT.md`](./DATA_AUDIT.md)、[`SECURITY_AUDIT.md`](./SECURITY_AUDIT.md) 與 [`REFACTOR_PLAN.md`](./REFACTOR_PLAN.md)。需要專案擁有者親自完成的外部設定集中在 [`SETUP_REQUIRED.md`](./SETUP_REQUIRED.md)。每輪自主巡查記錄於 [`AUTONOMOUS_RUN_LOG.md`](./AUTONOMOUS_RUN_LOG.md)，顯著變更與待核准構想分別記錄於 [`CHANGELOG.md`](./CHANGELOG.md) 與 [`PROPOSALS.md`](./PROPOSALS.md)。
 
 供投資初學者使用的繁體中文市場晨報、資料來源追蹤、條件評分與投資紀律工具。系統不下單、不預測精確價格，也不提供保證獲利的訊號。
 
@@ -111,7 +111,7 @@ pnpm prisma studio
 
 ## Vercel 部署
 
-1. 將私人 GitHub repository 匯入 Vercel。
+1. 將 GitHub repository 匯入 Vercel；目前 repository 為公開，完成外部檢查後由擁有者決定是否改回 Private。
 2. 從 Vercel Marketplace 安裝 Neon，建立 PostgreSQL 並連結專案；整合會提供 `DATABASE_URL`。
 3. 在 Vercel Production、Preview 與 Development 設定需要的 server-side 環境變數。
 4. 部署時 `vercel-build` 會依序執行 Prisma Client 生成、`prisma migrate deploy` 與 Next.js build。

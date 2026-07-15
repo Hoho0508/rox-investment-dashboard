@@ -6,7 +6,7 @@
 
 ### GitHub
 
-- [ ] 確認私人 repository `Hoho0508/rox-investment-dashboard` 仍存在。
+- [ ] Repository 目前為公開；完成外部檢查後，決定是否維持 Public 或改回 Private。
 - [ ] 確認 Codex／本機 Git 只有此 repository 所需的存取權。
 - [ ] 若 GitHub 顯示任何未認得的授權，先撤銷再重新授權。
 
@@ -20,9 +20,9 @@
 
 ### FinMind
 
-- [ ] 在 FinMind 控制台確認 Token 仍有效。
+- [ ] **優先：撤銷先前曾貼在聊天中的 Token；不要再使用舊值。**
+- [ ] 建立新 Token 後，在 FinMind 控制台確認新 Token 有效。
 - [ ] 確認 `TaiwanStockPrice` 等所需資料集的額度與權限。
-- [ ] 若 Token 曾在聊天或畫面中公開，先撤銷並建立新 Token。
 - [ ] 只把新 Token 填入自己的 `.env` 或 Vercel Secret，變數名稱固定為 `FINMIND_API_TOKEN`。
 
 ### Fugle（選用）
@@ -42,6 +42,7 @@
 - 美股即時行情、新聞、完整基本面與法人籌碼 Provider 尚未選定，不需要註冊新服務。
 - Tick 串流尚未啟用，不需要購買行情方案。
 - 本次不修改帳號權限、不購買方案、不部署正式環境。
+- Phase 1 僅完成稽核；請不要因文件中的 Phase 2～5 建議先行修改 production。
 
 ## 本機 Mock 啟動
 
