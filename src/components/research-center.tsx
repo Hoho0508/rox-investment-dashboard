@@ -15,6 +15,7 @@ type Props = {
   libraries: StockLibrary[];
   glossary: ReadonlyArray<{ term: string; explanation: string }>;
   initialSavedSymbols: string[];
+  eventsFetchedAtLabel: string;
 };
 
 const modeLabels = {
@@ -32,6 +33,7 @@ export function ResearchCenter({
   libraries,
   glossary,
   initialSavedSymbols,
+  eventsFetchedAtLabel,
 }: Props) {
   const [selected, setSelected] = useState(() => new Set<string>());
   const [saved, setSaved] = useState(() => new Set(initialSavedSymbols));
@@ -147,10 +149,7 @@ export function ResearchCenter({
           <a href={events.sourceUrl} target="_blank" rel="noreferrer">
             {events.sourceName}
           </a>
-          ・抓取時間{" "}
-          {new Date(events.fetchedAt).toLocaleString("zh-TW", {
-            timeZone: "Asia/Taipei",
-          })}
+          ・抓取時間 {eventsFetchedAtLabel}
           。公司可能變更時間，研究前請回官方公告確認。
         </p>
       </section>

@@ -1,4 +1,5 @@
 import { ResearchCenter } from "@/components/research-center";
+import { formatInTimeZone } from "date-fns-tz";
 import { getUpcomingInvestorConferences } from "@/lib/events/mops";
 import { getWatchlist } from "@/lib/market/watchlist";
 import { latestOrPreview } from "@/lib/reports/view";
@@ -28,6 +29,11 @@ export default async function ResearchPage() {
       libraries={STOCK_LIBRARIES}
       glossary={BEGINNER_GLOSSARY}
       initialSavedSymbols={watchlist.map((item) => item.symbol)}
+      eventsFetchedAtLabel={formatInTimeZone(
+        new Date(events.fetchedAt),
+        "Asia/Taipei",
+        "yyyy-MM-dd HH:mm:ss",
+      )}
     />
   );
 }

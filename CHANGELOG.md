@@ -11,6 +11,7 @@
 - 新增營收、EPS、自由現金流、本益比、RSI 與成交量的白話字典。
 - 新增記憶體、AI、IC 晶片、權值股四個研究倉庫，每類固定 10 檔；登入使用者可批次儲存到現有 PostgreSQL 自選股。
 - 新增股票倉庫白名單驗證、MOPS parser、事件失敗安全行為與新手判斷測試。
+- 法說資料抓取時間改由伺服器產生固定格式，避免不同執行環境的本地化文字造成 hydration 警告。
 
 ### Production Equity Data and Responsiveness
 
