@@ -154,7 +154,7 @@ Live 報告的正式跨市場輸入使用臺灣證券交易所 OpenAPI 的 TAIEX
 
 基本面由 TWSE 月營收、綜合損益、毛利率與本益比 OpenAPI，搭配 Yahoo Finance 歷史 time-series 計算。顯示最新 EPS、營收年增、EPS 年增、毛利率與趨勢、自由現金流與趨勢、目前／歷史本益比。預估本益比需要分析師一致預期授權；在沒有合規來源時保持空白，且不會拿歷史本益比冒充。Goodinfo 目前有 Cloudflare 人機驗證且沒有採用可穩定自動化的公開 API，因此不繞過驗證或抓取頁面。
 
-K 線在有 Fugle Key 時優先使用 Fugle intraday／historical candles，否則使用 Yahoo Finance Chart；支援 1／5／15／30／60 分鐘與日／週／月。FinMind Token 存在時可供應日／週／月 K。Yahoo 資料一律標示 DELAYED；全部正式來源失敗時回傳空資料與原因，不產生模擬 K，也不會用日 K 假裝分 K。Tick 需要 trades 串流與時序儲存層，尚未啟用。
+K 線在有 Fugle Key 時優先使用 Fugle intraday／historical candles，否則使用 Yahoo Finance Chart；Fugle 拒絕個別代號或暫時失敗時也會改用 Yahoo 延遲正式 K。支援 1／5／15／30／60 分鐘與日／週／月。FinMind Token 存在時可供應日／週／月 K。Yahoo 資料一律標示 DELAYED；全部正式來源失敗時回傳空資料與原因，不產生模擬 K，也不會用日 K 假裝分 K。Tick 需要 trades 串流與時序儲存層，尚未啟用。
 
 技術分析 Business Logic 全部位於 `src/lib/technical/`；React Component 只負責資料請求與顯示。技術分數不是買賣指令，輸出限制為「適合開始研究／等待突破／等待回測／風險增加」，並必須附支持證據、反對證據、最大風險、失效條件與信心程度。
 

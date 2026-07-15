@@ -88,8 +88,8 @@
 - **選擇的工作：** 在不使用新登入或付費服務下，建立 Yahoo Finance、TWSE、TPEx 正式 Adapter，補足核心股票與歷史基本面；讓晨報、午盤、盤後共用同一資料來源；改善報告與市場操作按鈕的 pending、timeout 與重複點擊保護。
 - **修改檔案：** `AGENTS.md`、`src/lib/market/yahoo.ts`、`src/lib/market/official-taiwan.ts`、`src/lib/providers/official-equity-market.ts`、Provider Factory、Fugle K 線、報告產生器、主要資料 UI、互動回饋、測試與專案文件。
 - **執行命令：** `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm test:e2e`、`pnpm build`、三時段 Live smoke test、`git diff --check`。
-- **測試結果：** Prettier、ESLint、TypeScript 通過；Vitest 11 個檔案共 57 個測試通過；Playwright 桌面與手機共 16 個測試通過；Next.js production build 通過。三時段實際來源 smoke test 均取得 2330、NVDA、2317 正式延遲價格，情境機率合計 100%。
-- **發現的風險：** Yahoo 公開端點沒有合約式即時保證，因此一律標示 DELAYED；預估本益比需分析師一致預期授權，保持 unavailable；Goodinfo 有 Cloudflare 驗證，不繞過。process-memory stale cache 仍不能跨 Vercel instance。
+- **測試結果：** Prettier、ESLint、TypeScript 通過；Vitest 11 個檔案共 59 個測試通過；Playwright 桌面與手機共 16 個測試通過；Next.js production build 通過。三時段實際來源 smoke test 均取得 2330、NVDA、2317 正式延遲價格，情境機率合計 100%。
+- **發現的風險：** Yahoo 公開端點沒有合約式即時保證，因此一律標示 DELAYED；預估本益比需分析師一致預期授權，保持 unavailable；Goodinfo 有 Cloudflare 驗證，不繞過。Vercel 對 TPEx quote API 曾出現部分來源缺漏，已以 TWSE ISIN 官方上櫃清單補搜尋；Fugle K 線若拒絕個別代號，已改用 Yahoo 延遲正式 K。process-memory stale cache 仍不能跨 Vercel instance。
 - **跳過的項目：** 未建立帳號、未修改或輸出 Token、未購買服務、未繞過 Goodinfo 驗證、未改評分權重、未自動下單。
 - **需要核准的事項：** 未來若要逐筆即時美股或預估本益比，需另行核准有再散布與分析師預估授權的 Provider。
 - **下一輪建議：** 完成本次已明確授權的 Production 部署與三時段線上驗證後停止；下一輪優先處理跨 instance cache 與 API rate limit。

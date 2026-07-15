@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RealtimeTaiwanMarketProvider } from "@/lib/market/contracts";
+import { getTaiwanCandleSeries, resetCandleCacheForTests } from "@/lib/market";
 import {
   OfficialTaiwanMarketProvider,
   resetOfficialTaiwanCacheForTests,
@@ -77,7 +78,13 @@ const fundamentalsFixture = {
   },
 };
 
-afterEach(() => resetOfficialTaiwanCacheForTests());
+afterEach(() => {
+  resetOfficialTaiwanCacheForTests();
+  resetCandleCacheForTests();
+  delete process.env.DATA_MODE;
+  delete process.env.FUGLE_MARKETDATA_API_KEY;
+  vi.unstubAllGlobals();
+});
 
 describe("正式股票資料 Adapter", () => {
   it("證交所與櫃買中心提供全市場搜尋及延遲收盤行情", async () => {
@@ -129,6 +136,43 @@ describe("正式股票資料 Adapter", () => {
     );
   });
 
+  it("櫃買報價 API 失敗時以官方 ISIN 清單保留上櫃搜尋", async () => {
+    const fetcher = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("STOCK_DAY_ALL"))
+        return Response.json([
+          {
+            Date: "1150715",
+            Code: "2330",
+            Name: "台積電",
+            TradeVolume: "1000",
+            OpeningPrice: "198",
+            HighestPrice: "202",
+            LowestPrice: "197",
+            ClosingPrice: "200",
+            Change: "+2",
+          },
+        ]);
+      if (url.includes("tpex_mainboard_quotes"))
+        return new Response("temporarily blocked", { status: 503 });
+      return new Response(
+        "<tr><td bgcolor=#FAFAD2>6488　環球晶</td><td>TW0006488000</td></tr>",
+        { headers: { "Content-Type": "text/html; charset=utf-8" } },
+      );
+    }) as unknown as typeof fetch;
+
+    const rows = await new OfficialTaiwanMarketProvider(fetcher).search("6488");
+
+    expect(rows).toEqual([
+      {
+        symbol: "6488",
+        name: "環球晶",
+        exchange: "TPEx",
+        market: "TW",
+      },
+    ]);
+  });
+
   it("Yahoo 提供真實 K 線與可計算的歷史基本面，不填造預估本益比", async () => {
     const fetcher = vi.fn(async (input: string | URL | Request) =>
       String(input).includes("/chart/")
@@ -146,6 +190,27 @@ describe("正式股票資料 Adapter", () => {
     expect(fundamentals.values.freeCashFlowTrend).toBe(50);
     expect(fundamentals.values.trailingPe).toBeCloseTo(200 / 6.2);
     expect(fundamentals.values.forwardPe).toBeNull();
+  });
+
+  it("Fugle K 線拒絕代號時改用 Yahoo 延遲正式 K，不轉 Mock", async () => {
+    process.env.DATA_MODE = "live";
+    process.env.FUGLE_MARKETDATA_API_KEY = "test-only-key";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) =>
+        String(input).includes("api.fugle.tw")
+          ? new Response("invalid symbol", { status: 400 })
+          : Response.json(chartFixture("0050.TW", 106.3)),
+      ),
+    );
+
+    const series = await getTaiwanCandleSeries("0050", "1d");
+
+    expect(series.dataMode).toBe("delayed");
+    expect(series.sourceName).toBe("Yahoo Finance Chart");
+    expect(series.candles).toHaveLength(2);
+    expect(series.errorCode).toBe("PRIMARY_SOURCE_UNAVAILABLE");
+    expect(JSON.stringify(series)).not.toContain("Mock");
   });
 
   it("季度 EPS 不足五期時使用年度 EPS 年增率，不捏造缺少的季度", async () => {

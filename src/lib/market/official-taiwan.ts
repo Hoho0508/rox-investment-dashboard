@@ -13,6 +13,7 @@ const TWSE_STOCK_URL =
   "https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL";
 const TPEX_STOCK_URL =
   "https://www.tpex.org.tw/openapi/v1/tpex_mainboard_quotes";
+const TPEX_ISIN_URL = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=4";
 
 const twseSchema = z.array(
   z.object({
@@ -58,6 +59,8 @@ type OfficialTaiwanRow = {
 };
 
 let officialCache: { expiresAt: number; rows: OfficialTaiwanRow[] } | undefined;
+let tpexSecurityCache:
+  { expiresAt: number; rows: TaiwanSecurity[] } | undefined;
 
 function number(value: string, allowNull = false) {
   const normalized = value.replaceAll(",", "").replace(/^\+/, "").trim();
@@ -153,6 +156,39 @@ async function fetchTpex(fetcher: typeof fetch) {
   });
 }
 
+async function fetchTpexSecuritiesFromIsin(fetcher: typeof fetch) {
+  if (tpexSecurityCache && tpexSecurityCache.expiresAt > Date.now())
+    return tpexSecurityCache.rows;
+  const response = await fetcher(TPEX_ISIN_URL, {
+    headers: { Accept: "text/html" },
+    signal: AbortSignal.timeout(6_000),
+    next: { revalidate: 21_600 },
+  });
+  if (!response.ok)
+    throw providerHttpError("臺灣證券交易所 ISIN 公開資料", response.status);
+  const charset = response.headers.get("content-type")?.includes("utf-8")
+    ? "utf-8"
+    : "big5";
+  const html = new TextDecoder(charset).decode(await response.arrayBuffer());
+  const rows: TaiwanSecurity[] = [];
+  const rowPattern = /<tr><td[^>]*>([0-9A-Z]{4,10})[\s　]+([^<]+)<\/td>/gi;
+  for (const match of html.matchAll(rowPattern)) {
+    rows.push({
+      symbol: match[1].trim(),
+      name: match[2].trim(),
+      exchange: "TPEx",
+      market: "TW",
+    });
+  }
+  if (rows.length === 0)
+    throw new ProviderError(
+      "EMPTY_DATA",
+      "臺灣證券交易所 ISIN 上櫃清單目前沒有資料。",
+    );
+  tpexSecurityCache = { expiresAt: Date.now() + 21_600_000, rows };
+  return rows;
+}
+
 export async function fetchOfficialTaiwanRows(fetcher: typeof fetch = fetch) {
   if (officialCache && officialCache.expiresAt > Date.now())
     return officialCache.rows;
@@ -181,7 +217,22 @@ export class OfficialTaiwanMarketProvider implements RealtimeTaiwanMarketProvide
 
   async search(query: string, limit = 20): Promise<TaiwanSecurity[]> {
     const normalized = query.trim().toLowerCase();
-    return (await fetchOfficialTaiwanRows(this.fetcher))
+    const officialRows = await fetchOfficialTaiwanRows(this.fetcher);
+    const securities: TaiwanSecurity[] = officialRows.map((item) => ({
+      symbol: item.symbol,
+      name: item.name,
+      exchange: item.exchange,
+      market: "TW",
+    }));
+    if (!officialRows.some((item) => item.exchange === "TPEx")) {
+      try {
+        securities.push(...(await fetchTpexSecuritiesFromIsin(this.fetcher)));
+      } catch {
+        // TWSE results remain usable; the API envelope will stay honest by
+        // returning only securities actually obtained from official sources.
+      }
+    }
+    return securities
       .filter(
         (item) =>
           !normalized ||
@@ -189,12 +240,7 @@ export class OfficialTaiwanMarketProvider implements RealtimeTaiwanMarketProvide
           item.name.toLowerCase().includes(normalized),
       )
       .slice(0, limit)
-      .map((item) => ({
-        symbol: item.symbol,
-        name: item.name,
-        exchange: item.exchange,
-        market: "TW" as const,
-      }));
+      .map((item) => item);
   }
 
   async getQuotes(symbols: string[]): Promise<LiveQuote[]> {
@@ -252,4 +298,5 @@ export class OfficialTaiwanMarketProvider implements RealtimeTaiwanMarketProvide
 
 export function resetOfficialTaiwanCacheForTests() {
   officialCache = undefined;
+  tpexSecurityCache = undefined;
 }

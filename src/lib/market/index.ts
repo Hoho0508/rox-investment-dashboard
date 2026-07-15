@@ -39,7 +39,7 @@ export async function searchTaiwanSecurities(
       sourceName:
         resolution.mode === "mock"
           ? "Rox Mock 股票清單"
-          : "臺灣證券交易所與櫃買中心 OpenAPI",
+          : "臺灣證券交易所、櫃買中心與 ISIN 公開資料",
       fetchedAt,
       lastSuccessfulFetchAt: fetchedAt,
       isDelayed: true,
@@ -138,6 +138,51 @@ function staleOrUnavailable(
   };
 }
 
+function buildLiveSeries(
+  symbol: string,
+  interval: CandleInterval,
+  limit: number,
+  sourceKind: "fugle" | "finmind" | "yahoo",
+  raw: PriceCandle[],
+  fallbackMessage?: string,
+) {
+  const fetchedAt = new Date().toISOString();
+  const normalized =
+    sourceKind === "finmind" && interval === "1w"
+      ? aggregateCandles(raw, "1w")
+      : sourceKind === "finmind" && interval === "1mo"
+        ? aggregateCandles(raw, "1mo")
+        : raw;
+  const candles = normalized.slice(-limit);
+  const series: CandleSeries = {
+    symbol,
+    interval,
+    candles,
+    sourceName:
+      sourceKind === "fugle"
+        ? "Fugle Candles"
+        : sourceKind === "finmind"
+          ? "FinMind / TaiwanStockPrice"
+          : "Yahoo Finance Chart",
+    sourceUrl:
+      sourceKind === "fugle"
+        ? "https://api.fugle.tw/marketdata/v1.0/stock"
+        : sourceKind === "finmind"
+          ? "https://api.finmindtrade.com/api/v4/data"
+          : "https://finance.yahoo.com",
+    dataMode: sourceKind === "fugle" ? "live" : "delayed",
+    isDelayed: sourceKind !== "fugle",
+    supportsLive: sourceKind === "fugle",
+    asOf: candles.at(-1)?.time ?? fetchedAt,
+    fetchedAt,
+    lastSuccessfulFetchAt: fetchedAt,
+    errorCode: fallbackMessage ? "PRIMARY_SOURCE_UNAVAILABLE" : undefined,
+    errorMessage: fallbackMessage,
+  };
+  candleCache.set(`${symbol}:${interval}`, series);
+  return series;
+}
+
 export async function getTaiwanCandleSeries(
   symbol: string,
   interval: CandleInterval,
@@ -200,38 +245,7 @@ export async function getTaiwanCandleSeries(
         : source.kind === "finmind"
           ? await fetchFinMindCandles(symbol, limit)
           : (await fetchYahooCandles(symbol, interval, limit)).candles;
-    const normalized =
-      source.kind === "finmind" && interval === "1w"
-        ? aggregateCandles(raw, "1w")
-        : source.kind === "finmind" && interval === "1mo"
-          ? aggregateCandles(raw, "1mo")
-          : raw;
-    const candles = normalized.slice(-limit);
-    const series: CandleSeries = {
-      symbol,
-      interval,
-      candles,
-      sourceName:
-        source.kind === "fugle"
-          ? "Fugle Candles"
-          : source.kind === "finmind"
-            ? "FinMind / TaiwanStockPrice"
-            : "Yahoo Finance Chart",
-      sourceUrl:
-        source.kind === "fugle"
-          ? "https://api.fugle.tw/marketdata/v1.0/stock"
-          : source.kind === "finmind"
-            ? "https://api.finmindtrade.com/api/v4/data"
-            : "https://finance.yahoo.com",
-      dataMode: source.kind === "fugle" ? "live" : "delayed",
-      isDelayed: source.kind !== "fugle",
-      supportsLive: source.kind === "fugle",
-      asOf: candles.at(-1)?.time ?? fetchedAt,
-      fetchedAt,
-      lastSuccessfulFetchAt: fetchedAt,
-    };
-    candleCache.set(`${symbol}:${interval}`, series);
-    return series;
+    return buildLiveSeries(symbol, interval, limit, source.kind, raw);
   } catch (error) {
     const provider =
       source.kind === "fugle"
@@ -240,6 +254,30 @@ export async function getTaiwanCandleSeries(
           ? "FinMind"
           : "Yahoo Finance";
     const normalized = normalizeProviderError(error, provider);
+    if (source.kind !== "yahoo") {
+      try {
+        const yahoo = await fetchYahooCandles(symbol, interval, limit);
+        return buildLiveSeries(
+          symbol,
+          interval,
+          limit,
+          "yahoo",
+          yahoo.candles,
+          `${provider} 暫時 unavailable，已改用 Yahoo Finance 延遲 K 線。`,
+        );
+      } catch (yahooError) {
+        const yahooNormalized = normalizeProviderError(
+          yahooError,
+          "Yahoo Finance",
+        );
+        return staleOrUnavailable(
+          symbol,
+          interval,
+          yahooNormalized.code,
+          `${normalized.message}；${yahooNormalized.message}`,
+        );
+      }
+    }
     return staleOrUnavailable(
       symbol,
       interval,
